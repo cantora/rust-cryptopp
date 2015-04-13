@@ -1,0 +1,16 @@
+[package]
+name = "rust-cryptopp"
+version = "0.0.1"
+authors = ["anthony cantor"]
+
+build = "build.rs"
+
+[dependencies]
+libc = "0.1"
+
+[dev-dependencies]
+rustc-serialize = "0.3"
+
+[build-dependencies]
+pkg-config = "0.3"
+gcc = "0.3"
