@@ -8,14 +8,14 @@ pub struct Sha3 {
 
 impl Drop for Sha3 {
   fn drop(&mut self) {
-    unsafe { cpp::SHA3_256_delete(self.ctx) };
+    unsafe { cpp::delete_SHA3_256(self.ctx) };
   }
 }
 
 impl Sha3 {
   pub fn new() -> Sha3 {
     let ctx = unsafe {
-      cpp::SHA3_256_new()
+      cpp::new_SHA3_256()
     };
 
     Sha3 { ctx: ctx }

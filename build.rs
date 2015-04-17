@@ -19,10 +19,16 @@ fn main() {
 
   for dent in fs::read_dir("src/cpp").unwrap() {
     let path = dent.unwrap().path();
-    println!("{:?}", path);
     let item = fs::metadata(&path).unwrap();
-    if item.is_file() {
-      config.file(path);
+    if !item.is_file() {
+      continue;
+    }
+
+    if let Some(ref ext) = path.extension() {
+      if *ext == "cpp" {
+        println!("{:?}", path);
+        config.file(&path);
+      }
     }
   }
 
