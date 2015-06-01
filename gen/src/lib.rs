@@ -51,6 +51,25 @@ impl FunctionArgs {
 
     Ok(())
   }
+
+  pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+    if let Some(slice) = self.as_slice() {
+      let mut i = 0u32;
+
+      for btype in slice.iter() {
+        if i > 0 {
+          try!(out_stream.write_all(b", "));
+        }
+
+        try!(write!(out_stream, "arg{}: ", i));
+        try!(btype.generate_rs(out_stream));
+
+        i += 1;
+      }
+    }
+
+    Ok(())
+  }
 }
 
 pub struct Function {
@@ -154,6 +173,48 @@ impl Class {
 
     Ok(())
   }
+
+  pub fn generate_rs(&self,
+                     namespace: &Vec<&'static [u8]>,
+                     name: &'static [u8],
+                     out_stream: &mut io::Write) -> io::Result<()> {
+    try!(out_stream.write_all(
+      b"extern {\n"
+    ));
+
+    for (method_name, function_desc) in self.methods.iter() {
+
+      try!(out_stream.write_all(b"pub fn "));
+      for ns_part in namespace.iter() {
+        try!(out_stream.write_all(ns_part));
+        try!(out_stream.write_all(b"_"));
+      }
+      try!(out_stream.write_all(name));
+      try!(out_stream.write_all(b"_"));
+      try!(out_stream.write_all(method_name));
+      try!(out_stream.write_all(b"("));
+
+      try!(out_stream.write_all(b"ctx: *mut c_void"));
+
+      let arg_len = function_desc.args.len();
+      if arg_len > 0 {
+        try!(out_stream.write_all(b", "));
+        try!(function_desc.args.generate_rs(out_stream));
+      }
+
+      try!(out_stream.write_all(b")"));
+
+      if !function_desc.ret.is_void() {
+        try!(out_stream.write_all(b" -> "));
+        try!(function_desc.ret.generate_rs(out_stream));
+      }
+      try!(out_stream.write_all(b";\n"));
+    }
+
+    try!(out_stream.write_all(b"}"));
+
+    Ok(())
+  }
 }
 
 #[macro_export]
@@ -211,10 +272,26 @@ pub mod proto {
         },
         &ConstPointer(ref t) => {
           try!(t.generate_cpp(out_stream));
-          out_stream.write_all(b"const *")
+          out_stream.write_all(b" const*")
         }
       } // match self
     } // generate_cpp
+
+    pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+      use self::BasicType::*;
+
+      match self {
+        &Simple(ref t)       => t.generate_rs(out_stream),
+        &MutPointer(ref t)   => {
+          try!(out_stream.write_all(b"*mut "));
+          t.generate_rs(out_stream)
+        },
+        &ConstPointer(ref t) => {
+          try!(out_stream.write_all(b"*const "));
+          t.generate_rs(out_stream)
+        }
+      } // match self
+    } // generate_rs
   }
   
   pub enum CType {
@@ -237,6 +314,17 @@ pub mod proto {
         &UInt       => b"unsigned int",
       }) // write_all(match...)
     } // generate_cpp
+
+    pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+      use self::CType::*;
+
+      out_stream.write_all(match self {
+        &Void       => b"c_void",
+        &UChar      => b"c_uchar",
+        &SizeT      => b"size_t",
+        &UInt       => b"c_uint",
+      }) // write_all(match...)
+    } // generate_rs
   }
 
   pub fn void() -> BasicType {
