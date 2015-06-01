@@ -77,8 +77,20 @@ pub struct Function {
   pub args: FunctionArgs
 }
 
+pub struct Method {
+  func: Function,
+  is_const: bool
+}
+
+pub fn method(func: Function, is_const: bool) -> Method {
+  Method {
+    func: func,
+    is_const: is_const
+  }
+}
+
 pub struct Class {
-  methods: HashMap<&'static [u8], Function>
+  methods: HashMap<&'static [u8], Method>
 }
 
 pub fn class() -> Class {
@@ -89,37 +101,54 @@ pub fn class() -> Class {
 
 #[macro_export]
 macro_rules! class_methods {
-  
-  ($cls:expr => { $( $t:tt )* } ) => ({
+  ($cls:expr => { mutable methods: $( $t:tt )* } ) => ({
     let mut cls = $cls;
-    class_methods!(cls, $( $t )*)
+    class_methods!(cls, false, $( $t )* )
   });
 
-  ($cls:expr , ) => (
+  ($cls:expr => { const methods: $( $t:tt )* } ) => ({
+    let mut cls = $cls;
+    class_methods!(cls, true, $( $t )* )
+  });
+
+  ($cls:expr , $is_const:expr, ) => (
     $cls
   );
 
-  ($cls:expr , $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, function!($rtype));
-    class_methods!($cls, $( $t )*)
+  ($cls:expr , $is_const:expr , mutable methods: $( $t:tt )* ) => (
+    class_methods!($cls, false, $( $t )* )
+  );
+
+  ($cls:expr , $is_const:expr , const methods: $( $t:tt )* ) => (
+    class_methods!($cls, true, $( $t )* )
+  );
+
+  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, $is_const, function!($rtype));
+    class_methods!($cls, $is_const, $( $t )*)
   });
 
-  ($cls:expr , $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, function!($rtype, $( $arg ),+ ));
-    class_methods!($cls, $( $t )*)
+  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, $is_const, function!($rtype, $( $arg ),+ ));
+    class_methods!($cls, $is_const, $( $t )*)
   });
 }
 
 impl Class {
-  pub fn add_method(&mut self, name: &'static [u8], function: Function) {
-    self.methods.insert(name, function);
+  pub fn add_method(&mut self,
+                    name: &'static [u8],
+                    is_const: bool,
+                    function: Function) {
+    self.methods.insert(name, method(function, is_const));
   }
 
   pub fn generate_cpp(&self,
                       namespace: &Vec<&'static [u8]>,
                       name: &'static [u8],
                       out_stream: &mut io::Write) -> io::Result<()> {
-    for (method_name, function_desc) in self.methods.iter() {
+    for (method_name, method_desc) in self.methods.iter() {
+      let function_desc = &method_desc.func;
+
       try!(out_stream.write_all(b"extern \"C\"\n"));
 
       try!(function_desc.ret.generate_cpp(out_stream));
@@ -139,6 +168,9 @@ impl Class {
         try!(out_stream.write_all(b"::"));
       }
       try!(out_stream.write_all(name));
+      if method_desc.is_const {
+        try!(out_stream.write_all(b" const"));
+      }
       try!(out_stream.write_all(b"*"));
 
       try!(out_stream.write_all(b" ctx"));
@@ -182,9 +214,10 @@ impl Class {
       b"extern {\n"
     ));
 
-    for (method_name, function_desc) in self.methods.iter() {
+    for (method_name, method_desc) in self.methods.iter() {
+      let function_desc = &method_desc.func;
 
-      try!(out_stream.write_all(b"pub fn "));
+      try!(out_stream.write_all(b"  pub fn "));
       for ns_part in namespace.iter() {
         try!(out_stream.write_all(ns_part));
         try!(out_stream.write_all(b"_"));
@@ -194,7 +227,13 @@ impl Class {
       try!(out_stream.write_all(method_name));
       try!(out_stream.write_all(b"("));
 
-      try!(out_stream.write_all(b"ctx: *mut c_void"));
+      try!(out_stream.write_all(b"ctx: *"));
+      try!(out_stream.write_all(if method_desc.is_const {
+        b"const "
+      } else {
+        b"mut "
+      }));
+      try!(out_stream.write_all(b"c_void"));
 
       let arg_len = function_desc.args.len();
       if arg_len > 0 {
@@ -211,7 +250,7 @@ impl Class {
       try!(out_stream.write_all(b";\n"));
     }
 
-    try!(out_stream.write_all(b"}"));
+    try!(out_stream.write_all(b"}\n"));
 
     Ok(())
   }

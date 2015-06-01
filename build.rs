@@ -24,10 +24,12 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
   let namespace = vec![];
 
   let class = class_methods!(gen::class() => {
-    void(), b"Update",     const_ptr(UChar), size_t();
-    void(), b"Final",      mut_ptr(UChar);
-    void(), b"Restart";
-    uint(), b"DigestSize";
+    mutable methods:
+      void(), b"Update",     const_ptr(UChar), size_t();
+      void(), b"Final",      mut_ptr(UChar);
+      void(), b"Restart";
+    const methods:
+      uint(), b"DigestSize";
   });
 
   try!(cpp_stream.write_all(b"#include <cryptopp/cryptlib.h>\n"));
