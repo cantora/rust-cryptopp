@@ -14,3 +14,7 @@ rustc-serialize = "0.3"
 [build-dependencies]
 pkg-config = "0.3"
 gcc = "0.3"
+
+[build-dependencies.rust-cryptopp-gen]
+path = "gen"
+

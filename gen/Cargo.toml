@@ -1,0 +1,4 @@
+[package]
+name = "rust-cryptopp-gen"
+version = "0.0.1"
+authors = ["anthony cantor"]
