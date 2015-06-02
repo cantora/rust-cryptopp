@@ -1,11 +1,12 @@
 extern crate pkg_config;
 extern crate gcc;
 
-#[macro_use(function, void_function, class_methods)]
+#[macro_use]
 extern crate rust_cryptopp_gen as gen;
 
 use std::io;
 use std::io::Write;
+use std::fs::File;
 
 fn find_cryptopp() -> pkg_config::Library {
   match pkg_config::find_library("libcrypto++") {
@@ -14,35 +15,21 @@ fn find_cryptopp() -> pkg_config::Library {
   }
 }
 
-fn gen_hash_transformation(cpp_stream: &mut Write,
-                           rs_stream: &mut Write) -> io::Result<()> {
+fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
   use gen::proto::*;
 
-  let namespace = vec![];
-
-  let class = class_methods!(gen::class() => {
+  ctx.generate(class!(b"HashTransformation" => {
     mutable methods:
       void(), b"Update",     const_ptr(UChar), size_t();
       void(), b"Final",      mut_ptr(UChar);
       void(), b"Restart";
     const methods:
       uint(), b"DigestSize";
-  });
-
-  try!(class.generate_cpp(&namespace,
-                          b"HashTransformation",
-                          cpp_stream));
-
-  try!(class.generate_rs(&namespace,
-                         b"HashTransformation",
-                         rs_stream));
-
-  Ok(())
+  }))
 }
 
 fn gen_cpp_code(cpp_path: &std::path::Path,
                 rust_path: &std::path::Path) -> io::Result<()> {
-  use std::fs::File;
 
   let mut cpp_stream = try!(File::create(cpp_path));
 
@@ -52,9 +39,8 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
   let mut rs_stream = try!(File::create(rust_path));
   try!(rs_stream.write_all(b"#[link(name = \"rustcryptopp\")]\n"));
 
-  try!(gen_hash_transformation(&mut cpp_stream, &mut rs_stream));
-
-  Ok(())
+  let ctx = gen::Context::new(cpp_stream, rs_stream);
+  gen_classes(ctx)
 }
  
 fn main() {

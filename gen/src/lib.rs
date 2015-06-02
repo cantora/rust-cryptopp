@@ -1,5 +1,27 @@
 use std::collections::hash_map::HashMap;
 use std::io;
+use std::io::Write;
+
+pub struct Context<T, U> {
+  cpp_stream: T,
+  rs_stream: U
+}
+
+impl<T: Write, U: Write> Context<T, U> {
+  pub fn new(cpp_stream: T, rs_stream: U) -> Context<T, U> {
+    Context { cpp_stream: cpp_stream, rs_stream: rs_stream }
+  }
+
+  pub fn generate<'a>(&mut self, class: NamedClass<'a>) -> io::Result<()> {
+//                  namespace: &Vec<&[u8]>,
+//                  name: &[u8],
+//                  class: Class) -> io::Result<()> {
+    class.anon_class.generate(&class.namespace,
+                              class.name,
+                              &mut self.cpp_stream,
+                              &mut self.rs_stream)
+  }
+}
 
 pub enum FunctionArgs {
   None,
@@ -33,7 +55,7 @@ impl FunctionArgs {
     }
   }
 
-  pub fn generate_cpp(&self, out_stream: &mut io::Write) -> io::Result<()> {
+  pub fn generate_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -52,7 +74,7 @@ impl FunctionArgs {
     Ok(())
   }
 
-  pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+  pub fn generate_rs(&self, out_stream: &mut Write) -> io::Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -86,6 +108,45 @@ pub fn method(func: Function, is_const: bool) -> Method {
   Method {
     func: func,
     is_const: is_const
+  }
+}
+
+#[macro_export]
+macro_rules! class {
+  ( $name:expr => $b:tt ) => ({
+    let anon_class = class_methods!($crate::class() => $b);
+    $crate::NamedClass::new(
+      vec![],
+      $name,
+      anon_class
+    )    
+  });
+
+  ( $ns:expr, $name:expr => $b:tt ) => ({
+    let anon_class = class_methods!($crate::class() => $b);
+    $crate::NamedClass::new(
+      $ns,
+      $name,
+      anon_class
+    )    
+  });
+}
+
+pub struct NamedClass<'a> {
+  pub namespace:  Vec<&'a [u8]>,
+  pub name:       &'a [u8],
+  pub anon_class: Class
+}
+
+impl<'a> NamedClass<'a> {
+  pub fn new(namespace:  Vec<&'a [u8]>,
+             name:       &'a [u8],
+             anon_class: Class) -> NamedClass<'a> {
+    NamedClass {
+      namespace: namespace,
+      name: name,
+      anon_class: anon_class
+    }
   }
 }
 
@@ -143,9 +204,9 @@ impl Class {
   }
 
   pub fn generate_cpp(&self,
-                      namespace: &Vec<&'static [u8]>,
-                      name: &'static [u8],
-                      out_stream: &mut io::Write) -> io::Result<()> {
+                      namespace: &Vec<&[u8]>,
+                      name: &[u8],
+                      out_stream: &mut Write) -> io::Result<()> {
     for (method_name, method_desc) in self.methods.iter() {
       let function_desc = &method_desc.func;
 
@@ -207,9 +268,9 @@ impl Class {
   }
 
   pub fn generate_rs(&self,
-                     namespace: &Vec<&'static [u8]>,
-                     name: &'static [u8],
-                     out_stream: &mut io::Write) -> io::Result<()> {
+                     namespace: &Vec<&[u8]>,
+                     name: &[u8],
+                     out_stream: &mut Write) -> io::Result<()> {
     try!(out_stream.write_all(
       b"extern {\n"
     ));
@@ -254,6 +315,15 @@ impl Class {
 
     Ok(())
   }
+
+  pub fn generate(&self,
+              namespace: &Vec<&[u8]>,
+              name: &[u8],
+              cpp_stream: &mut Write,
+              rs_stream: &mut Write) -> io::Result<()> {
+    try!(self.generate_cpp(&namespace, name, cpp_stream));
+    self.generate_rs(&namespace, name, rs_stream)
+  }
 }
 
 #[macro_export]
@@ -283,6 +353,7 @@ macro_rules! void_function {
 
 pub mod proto {
   use std::io;
+  use std::io::Write;
 
   pub enum BasicType {
     Simple(CType),
@@ -300,7 +371,7 @@ pub mod proto {
       false
     }
 
-    pub fn generate_cpp(&self, out_stream: &mut io::Write) -> io::Result<()> {
+    pub fn generate_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
       use self::BasicType::*;
 
       match self {
@@ -316,7 +387,7 @@ pub mod proto {
       } // match self
     } // generate_cpp
 
-    pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+    pub fn generate_rs(&self, out_stream: &mut Write) -> io::Result<()> {
       use self::BasicType::*;
 
       match self {
@@ -343,7 +414,7 @@ pub mod proto {
   pub use self::CType::*;
 
   impl CType {
-    pub fn generate_cpp(&self, out_stream: &mut io::Write) -> io::Result<()> {
+    pub fn generate_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
       use self::CType::*;
 
       out_stream.write_all(match self {
@@ -354,7 +425,7 @@ pub mod proto {
       }) // write_all(match...)
     } // generate_cpp
 
-    pub fn generate_rs(&self, out_stream: &mut io::Write) -> io::Result<()> {
+    pub fn generate_rs(&self, out_stream: &mut Write) -> io::Result<()> {
       use self::CType::*;
 
       out_stream.write_all(match self {
