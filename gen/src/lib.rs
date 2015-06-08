@@ -200,51 +200,9 @@ macro_rules! class_methods {
   });
 }
 
-/*
-  ($cls:expr, mut_method ) => (
-    $cls
-  );
-
-  ($cls:expr, const_method mutable methods: $( $t:tt )* ) => (
-    class_bindings!($cls, mut_method $( $t )* )
-  );
-
-  ($cls:expr , mut_method $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, false, function!($rtype));
-    class_bindings!($cls, mut_method $( $t )*)
-  });
-
-  ($cls:expr , mut_method $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, false, function!($rtype, $( $arg ),+ ));
-    class_bindings!($cls, mut_method $( $t )*)
-  });
-
-  ($cls:expr => { constant methods: $( $t:tt )* } ) => ({
-    let mut cls = $cls;
-    class_bindings!(cls, const_method $( $t )* )
-  });
-
-  ($cls:expr, const_method ) => (
-    $cls
-  );
-
-  ($cls:expr , mut_method constant methods: $( $t:tt )* ) => (
-    class_bindings!($cls, const_method $( $t )* )
-  );
-
-  ($cls:expr , const_method $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, true, function!($rtype));
-    class_bindings!($cls, const_method $( $t )*)
-  });
-
-  ($cls:expr , const_method $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, true, function!($rtype, $( $arg ),+ ));
-    class_bindings!($cls, const_method $( $t )*)
-  });
-*/
 pub struct Class {
   methods: HashMap<&'static [u8], Method>,
-  ctors: HashMap<&'static [u8], Function>
+  ctors: HashMap<&'static [u8], FunctionArgs>
 }
 
 pub fn class() -> Class {
@@ -252,6 +210,26 @@ pub fn class() -> Class {
     methods: HashMap::new(),
     ctors:   HashMap::new()
   }
+}
+
+fn generate_c_path(namespace: &Vec<&[u8]>,
+                   name: &[u8],
+                   out: &mut Write) -> io::Result<()> {
+  for ns_part in namespace.iter() {
+    try!(out.write_all(ns_part));
+    try!(out.write_all(b"_"));
+  }
+  out.write_all(name)
+}
+
+fn generate_cpp_path(namespace: &Vec<&[u8]>,
+                    name: &[u8],
+                    out: &mut Write) -> io::Result<()> {
+  for ns_part in namespace.iter() {
+    try!(out.write_all(ns_part));
+    try!(out.write_all(b"::"));
+  }
+  out.write_all(name)
 }
 
 impl Class {
@@ -262,14 +240,82 @@ impl Class {
     self.methods.insert(name, method(function, is_const));
   }
 
-  pub fn add_constructor(&mut self, name: &'static [u8], function: Function) {
-    self.ctors.insert(name, function);
+  pub fn add_constructor(&mut self, name: &'static [u8], args: FunctionArgs) {
+    self.ctors.insert(name, args);
   }
 
   pub fn generate_cpp(&self,
                       namespace: &Vec<&[u8]>,
                       name: &[u8],
                       out_stream: &mut Write) -> io::Result<()> {
+    try!(self.generate_cpp_ctors(namespace, name, out_stream));
+    self.generate_cpp_methods(namespace, name, out_stream)
+  }
+
+  fn generate_cpp_ctors(&self,
+                        namespace: &Vec<&[u8]>,
+                        name: &[u8],
+                        out_stream: &mut Write) -> io::Result<()> {
+    for (ctor_name, ctor_args) in self.ctors.iter() {
+      try!(out_stream.write_all(b"extern \"C\"\n"));
+
+      try!(out_stream.write_all(b"void *"));
+
+      try!(out_stream.write_all(b" new_"));
+      if ctor_name.len() > 0 {
+        try!(out_stream.write_all(ctor_name));
+        try!(out_stream.write_all(b"_"));
+      }
+      try!(generate_c_path(namespace, name, out_stream));
+
+      try!(out_stream.write_all(b"("));
+
+      let arg_len = ctor_args.len();
+      if arg_len > 0 {
+        try!(out_stream.write_all(b", "));
+        try!(ctor_args.generate_cpp(out_stream));
+      }
+
+      try!(out_stream.write_all(b")"));
+
+      try!(out_stream.write_all(b" {\n  "));
+      try!(out_stream.write_all(b"return new "));
+
+      try!(generate_cpp_path(namespace, name, out_stream));
+
+      try!(out_stream.write_all(b"("));
+
+      for i in (0..arg_len) {
+        if i > 0 {
+          try!(out_stream.write_all(b", "));
+        }
+        try!(write!(out_stream, "arg{}", i));
+      }
+
+      try!(out_stream.write_all(b");\n"));
+      try!(out_stream.write_all(b"}"));
+      try!(out_stream.write_all(b"\n\n"));
+    }
+
+    try!(out_stream.write_all(b"void "));
+
+    try!(out_stream.write_all(b" del_"));
+    try!(generate_c_path(namespace, name, out_stream));
+    try!(out_stream.write_all(b"("));
+
+    try!(generate_cpp_path(namespace, name, out_stream));
+    try!(out_stream.write_all(b"*"));
+    try!(out_stream.write_all(b" ctx"));
+    try!(out_stream.write_all(b")"));
+    try!(out_stream.write_all(b" {\n  delete ctx;\n}\n\n"));
+
+    Ok(())
+  }
+
+  fn generate_cpp_methods(&self,
+                          namespace: &Vec<&[u8]>,
+                          name: &[u8],
+                          out_stream: &mut Write) -> io::Result<()> {
     for (method_name, method_desc) in self.methods.iter() {
       let function_desc = &method_desc.func;
 
@@ -277,26 +323,17 @@ impl Class {
 
       try!(function_desc.ret.generate_cpp(out_stream));
 
-      try!(out_stream.write_all(b" "));
-      for ns_part in namespace.iter() {
-        try!(out_stream.write_all(ns_part));
-        try!(out_stream.write_all(b"_"));
-      }
-      try!(out_stream.write_all(name));
+      try!(out_stream.write_all(b" mth_"));
+      try!(generate_c_path(namespace, name, out_stream));
       try!(out_stream.write_all(b"_"));
       try!(out_stream.write_all(method_name));
       try!(out_stream.write_all(b"("));
 
-      for ns_part in namespace.iter() {
-        try!(out_stream.write_all(ns_part));
-        try!(out_stream.write_all(b"::"));
-      }
-      try!(out_stream.write_all(name));
+      try!(generate_cpp_path(namespace, name, out_stream));
       if method_desc.is_const {
         try!(out_stream.write_all(b" const"));
       }
       try!(out_stream.write_all(b"*"));
-
       try!(out_stream.write_all(b" ctx"));
 
       let arg_len = function_desc.args.len();
@@ -304,7 +341,6 @@ impl Class {
         try!(out_stream.write_all(b", "));
         try!(function_desc.args.generate_cpp(out_stream));
       }
-
       try!(out_stream.write_all(b")"));
 
       try!(out_stream.write_all(b" {\n  "));
@@ -338,15 +374,59 @@ impl Class {
       b"extern {\n"
     ));
 
+    try!(self.generate_rs_methods(namespace, name, out_stream));
+    try!(self.generate_rs_ctors(namespace, name, out_stream));
+
+    try!(out_stream.write_all(b"}\n"));
+
+    Ok(())
+  }
+
+  fn generate_rs_ctors(&self,
+                       namespace: &Vec<&[u8]>,
+                       name: &[u8],
+                       out_stream: &mut Write) -> io::Result<()> {
+    if self.ctors.len() < 1 {
+      return Ok(())
+    }
+
+    for (ctor_name, ctor_args) in self.ctors.iter() {
+      try!(out_stream.write_all(b"  pub fn new_"));
+      if ctor_name.len() > 0 {
+        try!(out_stream.write_all(ctor_name));
+        try!(out_stream.write_all(b"_"));
+      }
+      try!(generate_c_path(namespace, name, out_stream));
+
+      try!(out_stream.write_all(b"("));
+
+      let arg_len = ctor_args.len();
+      if arg_len > 0 {
+        try!(ctor_args.generate_rs(out_stream));
+      }
+
+      try!(out_stream.write_all(b")"));
+      try!(out_stream.write_all(b" -> *mut c_void"));
+      try!(out_stream.write_all(b";\n"));
+    }
+
+    try!(out_stream.write_all(b"  pub fn del_"));
+    try!(generate_c_path(namespace, name, out_stream));
+    try!(out_stream.write_all(b"(ctx: *mut c_void);\n"));
+
+    Ok(())
+  }
+
+  fn generate_rs_methods(&self,
+                         namespace: &Vec<&[u8]>,
+                         name: &[u8],
+                         out_stream: &mut Write) -> io::Result<()> {
     for (method_name, method_desc) in self.methods.iter() {
       let function_desc = &method_desc.func;
 
-      try!(out_stream.write_all(b"  pub fn "));
-      for ns_part in namespace.iter() {
-        try!(out_stream.write_all(ns_part));
-        try!(out_stream.write_all(b"_"));
-      }
-      try!(out_stream.write_all(name));
+      try!(out_stream.write_all(b"  pub fn mth_"));
+
+      try!(generate_c_path(namespace, name, out_stream));
       try!(out_stream.write_all(b"_"));
       try!(out_stream.write_all(method_name));
       try!(out_stream.write_all(b"("));
@@ -373,8 +453,6 @@ impl Class {
       }
       try!(out_stream.write_all(b";\n"));
     }
-
-    try!(out_stream.write_all(b"}\n"));
 
     Ok(())
   }

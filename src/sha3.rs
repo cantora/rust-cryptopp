@@ -23,7 +23,7 @@ impl Sha3 {
 
   pub fn update(&mut self, data: &[u8]) {
     unsafe {
-      cpp::HashTransformation_Update(self.ctx,
+      cpp::mth_HashTransformation_Update(self.ctx,
                                      data.as_ptr(),
                                      data.len() as size_t)
     };
@@ -32,7 +32,7 @@ impl Sha3 {
   pub fn digest(&mut self) -> [u8; 32] {
     let mut output = [0; 32];
     unsafe {
-      cpp::HashTransformation_Final(self.ctx, output.as_mut_ptr())
+      cpp::mth_HashTransformation_Final(self.ctx, output.as_mut_ptr())
     };
     output
   }
