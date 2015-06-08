@@ -13,9 +13,6 @@ impl<T: Write, U: Write> Context<T, U> {
   }
 
   pub fn generate<'a>(&mut self, class: NamedClass<'a>) -> io::Result<()> {
-//                  namespace: &Vec<&[u8]>,
-//                  name: &[u8],
-//                  class: Class) -> io::Result<()> {
     class.anon_class.generate(&class.namespace,
                               class.name,
                               &mut self.cpp_stream,
@@ -114,21 +111,21 @@ pub fn method(func: Function, is_const: bool) -> Method {
 #[macro_export]
 macro_rules! class {
   ( $name:expr => $b:tt ) => ({
-    let anon_class = class_methods!($crate::class() => $b);
+    let anon_class = class_bindings_block!($crate::class() => $b);
     $crate::NamedClass::new(
       vec![],
       $name,
       anon_class
-    )    
+    )
   });
 
   ( $ns:expr, $name:expr => $b:tt ) => ({
-    let anon_class = class_methods!($crate::class() => $b);
+    let anon_class = class_bindings_block!($crate::class() => $b);
     $crate::NamedClass::new(
       $ns,
       $name,
       anon_class
-    )    
+    )
   });
 }
 
@@ -150,49 +147,111 @@ impl<'a> NamedClass<'a> {
   }
 }
 
+//pub enum BindingType {
+//  MutableMethod,
+//  ConstMethod,
+//}
+//
+//pub struct BindingCtx {
+//  pub cls: Class,
+//  pub binding_type: 
+//}
+
+#[macro_export]
+macro_rules! class_bindings_block {
+  ($cls:expr => { $( $t:tt )* } ) => ({
+    let mut cls = $cls;
+    class_bindings!(cls, $( $t )*)
+  })
+}
+
+#[macro_export]
+macro_rules! class_bindings {
+  ($cls:expr, ) => (
+    $cls
+  );
+
+  ($cls:expr, mutable methods { $( $t:tt )* } $( $rest:tt )* ) => ({
+    let cls = class_methods!($cls, false, $( $t )*);
+    class_bindings!(cls, $( $rest )* )
+  });
+
+  ($cls:expr, constant methods { $( $t:tt )* } $( $rest:tt )* ) => ({
+    let cls = class_methods!($cls, true, $( $rest )*);
+    class_bindings!(cls, $( $rest )* )
+  });
+}
+
+
+#[macro_export]
+macro_rules! class_methods {
+  ($cls:expr , $is_const:expr , ) => (
+    $cls
+  );
+
+  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr ; $( $rest:tt )* ) => ({
+    $cls.add_method($mname, $is_const, function!($rtype) );
+    class_methods!($cls, $is_const, $( $rest )* )
+  });
+
+  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr, $( $args:expr ),+ ; $( $rest:tt )* ) => ({
+    $cls.add_method($mname, $is_const, function!($rtype, $( $args ),+ ) );
+    class_methods!($cls, $is_const, $( $rest )* )
+  });
+}
+
+/*
+  ($cls:expr, mut_method ) => (
+    $cls
+  );
+
+  ($cls:expr, const_method mutable methods: $( $t:tt )* ) => (
+    class_bindings!($cls, mut_method $( $t )* )
+  );
+
+  ($cls:expr , mut_method $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, false, function!($rtype));
+    class_bindings!($cls, mut_method $( $t )*)
+  });
+
+  ($cls:expr , mut_method $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, false, function!($rtype, $( $arg ),+ ));
+    class_bindings!($cls, mut_method $( $t )*)
+  });
+
+  ($cls:expr => { constant methods: $( $t:tt )* } ) => ({
+    let mut cls = $cls;
+    class_bindings!(cls, const_method $( $t )* )
+  });
+
+  ($cls:expr, const_method ) => (
+    $cls
+  );
+
+  ($cls:expr , mut_method constant methods: $( $t:tt )* ) => (
+    class_bindings!($cls, const_method $( $t )* )
+  );
+
+  ($cls:expr , const_method $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, true, function!($rtype));
+    class_bindings!($cls, const_method $( $t )*)
+  });
+
+  ($cls:expr , const_method $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
+    $cls.add_method($mname, true, function!($rtype, $( $arg ),+ ));
+    class_bindings!($cls, const_method $( $t )*)
+  });
+*/
 pub struct Class {
-  methods: HashMap<&'static [u8], Method>
+  methods: HashMap<&'static [u8], Method>,
+  ctors: HashMap<&'static [u8], Function>
 }
 
 pub fn class() -> Class {
   Class {
-    methods: HashMap::new()
+    methods: HashMap::new(),
+    ctors:   HashMap::new()
   }
-}
-
-#[macro_export]
-macro_rules! class_methods {
-  ($cls:expr => { mutable methods: $( $t:tt )* } ) => ({
-    let mut cls = $cls;
-    class_methods!(cls, false, $( $t )* )
-  });
-
-  ($cls:expr => { const methods: $( $t:tt )* } ) => ({
-    let mut cls = $cls;
-    class_methods!(cls, true, $( $t )* )
-  });
-
-  ($cls:expr , $is_const:expr, ) => (
-    $cls
-  );
-
-  ($cls:expr , $is_const:expr , mutable methods: $( $t:tt )* ) => (
-    class_methods!($cls, false, $( $t )* )
-  );
-
-  ($cls:expr , $is_const:expr , const methods: $( $t:tt )* ) => (
-    class_methods!($cls, true, $( $t )* )
-  );
-
-  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, $is_const, function!($rtype));
-    class_methods!($cls, $is_const, $( $t )*)
-  });
-
-  ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr , $( $arg:expr ),+ ; $( $t:tt )* ) => ({
-    $cls.add_method($mname, $is_const, function!($rtype, $( $arg ),+ ));
-    class_methods!($cls, $is_const, $( $t )*)
-  });
 }
 
 impl Class {
@@ -201,6 +260,10 @@ impl Class {
                     is_const: bool,
                     function: Function) {
     self.methods.insert(name, method(function, is_const));
+  }
+
+  pub fn add_constructor(&mut self, name: &'static [u8], function: Function) {
+    self.ctors.insert(name, function);
   }
 
   pub fn generate_cpp(&self,

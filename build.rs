@@ -19,13 +19,17 @@ fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
   use gen::proto::*;
 
   ctx.generate(class!(b"HashTransformation" => {
-    mutable methods:
+    mutable methods {
       void(), b"Update",     const_ptr(UChar), size_t();
       void(), b"Final",      mut_ptr(UChar);
       void(), b"Restart";
-    const methods:
+    }
+    constant methods {
       uint(), b"DigestSize";
+    }
   }))
+
+
 }
 
 fn gen_cpp_code(cpp_path: &std::path::Path,
