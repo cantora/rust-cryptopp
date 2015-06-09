@@ -8,7 +8,7 @@ pub struct Sha3 {
 
 impl Drop for Sha3 {
   fn drop(&mut self) {
-    unsafe { cpp::delete_SHA3_256(self.ctx) };
+    unsafe { cpp::del_SHA3_256(self.ctx) };
   }
 }
 

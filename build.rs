@@ -18,7 +18,7 @@ fn find_cryptopp() -> pkg_config::Library {
 fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
   use gen::proto::*;
 
-  ctx.generate(class!(b"HashTransformation" => {
+  try!(ctx.generate(class!(b"HashTransformation" => {
     mutable methods {
       void(), b"Update",     const_ptr(UChar), size_t();
       void(), b"Final",      mut_ptr(UChar);
@@ -27,9 +27,13 @@ fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
     constant methods {
       uint(), b"DigestSize";
     }
+  })));
+
+  ctx.generate(class!(b"SHA3_256" => {
+    constructors {
+      b"";
+    }
   }))
-
-
 }
 
 fn gen_cpp_code(cpp_path: &std::path::Path,
@@ -38,6 +42,7 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
   let mut cpp_stream = try!(File::create(cpp_path));
 
   try!(cpp_stream.write_all(b"#include <cryptopp/cryptlib.h>\n"));
+  try!(cpp_stream.write_all(b"#include <cryptopp/sha3.h>\n"));
   try!(cpp_stream.write_all(b"using namespace CryptoPP;\n\n"));
 
   let mut rs_stream = try!(File::create(rust_path));

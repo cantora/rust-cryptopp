@@ -6,9 +6,6 @@ include!(concat!(env!("OUT_DIR"), "/gen.rs"));
 
 #[link(name = "rustcryptopp")]
 extern {
-  pub fn new_SHA3_256() -> *mut c_void;
-  pub fn delete_SHA3_256(ctx: *mut c_void) -> c_uint;
-
   pub fn new_Integer() -> *mut c_void;
   pub fn delete_Integer(ctx: *mut c_void) -> *mut c_void;
   pub fn copy_Integer(ctx: *const c_void) -> *mut c_void;

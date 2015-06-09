@@ -180,8 +180,13 @@ macro_rules! class_bindings {
     let cls = class_methods!($cls, true, $( $rest )*);
     class_bindings!(cls, $( $rest )* )
   });
-}
 
+  ($cls:expr, constructors { $( $t:tt )* } $( $rest:tt )* ) => ({
+    let cls = class_ctors!($cls, $( $t )*);
+    class_bindings!(cls, $( $rest )* )
+  });
+
+}
 
 #[macro_export]
 macro_rules! class_methods {
@@ -197,6 +202,23 @@ macro_rules! class_methods {
   ($cls:expr , $is_const:expr , $rtype:expr , $mname:expr, $( $args:expr ),+ ; $( $rest:tt )* ) => ({
     $cls.add_method($mname, $is_const, function!($rtype, $( $args ),+ ) );
     class_methods!($cls, $is_const, $( $rest )* )
+  });
+}
+
+#[macro_export]
+macro_rules! class_ctors {
+  ($cls:expr , ) => (
+    $cls
+  );
+
+  ($cls:expr , $mname:expr ; $( $rest:tt )* ) => ({
+    $cls.add_constructor($mname, function_args!() );
+    class_ctors!($cls, $( $rest )* )
+  });
+
+  ($cls:expr , $mname:expr , $( $args:expr ),+ ; $( $rest:tt )* ) => ({
+    $cls.add_constructor($mname, function_args!($( $args ),+ ) );
+    class_methods!($cls, $( $rest )* )
   });
 }
 
@@ -297,9 +319,9 @@ impl Class {
       try!(out_stream.write_all(b"\n\n"));
     }
 
-    try!(out_stream.write_all(b"void "));
+    try!(out_stream.write_all(b"extern \"C\"\n"));
+    try!(out_stream.write_all(b"void del_"));
 
-    try!(out_stream.write_all(b" del_"));
     try!(generate_c_path(namespace, name, out_stream));
     try!(out_stream.write_all(b"("));
 
@@ -468,21 +490,31 @@ impl Class {
 }
 
 #[macro_export]
+macro_rules! function_args {
+  () => (
+    $crate::FunctionArgs::None
+  );
+
+  ($arg1:expr) => (
+    $crate::FunctionArgs::Args1([$arg1])
+  );
+
+  ($arg1:expr, $arg2:expr) => (
+    $crate::FunctionArgs::Args2([$arg1, $arg2])
+  );
+}
+
+#[macro_export]
 macro_rules! function {
   ($rtype:expr) => ($crate::Function {
     ret: $rtype,
-    args: $crate::FunctionArgs::None
+    args: function_args!()
   });
 
-  ($rtype:expr, $arg1:expr) => ($crate::Function {
+  ($rtype:expr, $( $args:expr ),+ ) => ($crate::Function {
     ret: $rtype,
-    args: $crate::FunctionArgs::Args1([$arg1])
+    args: function_args!($( $args ),+)
   });
-
-  ($rtype:expr, $arg1:expr, $arg2:expr) => ($crate::Function {
-    ret: $rtype,
-    args: $crate::FunctionArgs::Args2([$arg1, $arg2])
-  })
 }
 
 #[macro_export]
