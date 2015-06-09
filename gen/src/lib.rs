@@ -596,6 +596,7 @@ pub mod proto {
     UChar,
     UInt,
     SizeT,
+    Long,
     Custom(&'static [u8])
   }
 
@@ -606,10 +607,11 @@ pub mod proto {
       use self::CType::*;
 
       out_stream.write_all(match self {
-        &Void       => b"void",
-        &UChar      => b"unsigned char",
-        &SizeT      => b"size_t",
-        &UInt       => b"unsigned int",
+        &Void          => b"void",
+        &UChar         => b"unsigned char",
+        &SizeT         => b"size_t",
+        &UInt          => b"unsigned int",
+        &Long          => b"long",
         &Custom(ref s) => s,
       }) // write_all(match...)
     } // generate_cpp
@@ -618,11 +620,12 @@ pub mod proto {
       use self::CType::*;
 
       out_stream.write_all(match self {
-        &Void       => b"c_void",
+        &Void       |
+        &Custom(_)  => b"c_void",
         &UChar      => b"c_uchar",
         &SizeT      => b"size_t",
         &UInt       => b"c_uint",
-        &Custom(_)  => b"c_void",
+        &Long       => b"c_long",
       }) // write_all(match...)
     } // generate_rs
   }
@@ -637,6 +640,10 @@ pub mod proto {
 
   pub fn uint() -> BasicType {
     BasicType::Simple(CType::UInt)
+  }
+
+  pub fn long() -> BasicType {
+    BasicType::Simple(CType::Long)
   }
 
   pub fn mut_ptr(t: CType) -> BasicType {

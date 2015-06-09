@@ -38,7 +38,8 @@ fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
   ctx.generate(class!(b"Integer" => {
     constructors {
       b"";
-      b"copy", const_ref(Custom(b"Integer"));
+      b"copy",      const_ref(Custom(b"Integer"));
+      b"from_long", long();
     }
   }))
 }

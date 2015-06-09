@@ -1,4 +1,4 @@
-use libc::{c_void, c_long, size_t};
+use libc::{c_void, c_long};
 
 use cpp;
 
@@ -14,7 +14,7 @@ impl Drop for Integer {
 
 impl Clone for Integer {
   fn clone(&self) -> Integer {
-    let ctx = unsafe { cpp::copy_Integer(self.ctx) };
+    let ctx = unsafe { cpp::new_copy_Integer(self.ctx) };
     Integer { ctx: ctx }
   }
 }
@@ -37,7 +37,6 @@ impl Integer {
 pub fn new() -> Integer {
   Integer::new()
 }
-
 
 #[cfg(test)]
 mod test {
