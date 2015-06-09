@@ -218,7 +218,7 @@ macro_rules! class_ctors {
 
   ($cls:expr , $mname:expr , $( $args:expr ),+ ; $( $rest:tt )* ) => ({
     $cls.add_constructor($mname, function_args!($( $args ),+ ) );
-    class_methods!($cls, $( $rest )* )
+    class_ctors!($cls, $( $rest )* )
   });
 }
 
@@ -281,7 +281,8 @@ impl Class {
     for (ctor_name, ctor_args) in self.ctors.iter() {
       try!(out_stream.write_all(b"extern \"C\"\n"));
 
-      try!(out_stream.write_all(b"void *"));
+      try!(generate_cpp_path(namespace, name, out_stream));
+      try!(out_stream.write_all(b" *"));
 
       try!(out_stream.write_all(b" new_"));
       if ctor_name.len() > 0 {
@@ -294,7 +295,6 @@ impl Class {
 
       let arg_len = ctor_args.len();
       if arg_len > 0 {
-        try!(out_stream.write_all(b", "));
         try!(ctor_args.generate_cpp(out_stream));
       }
 
@@ -581,7 +581,8 @@ pub mod proto {
     Void,
     UChar,
     UInt,
-    SizeT
+    SizeT,
+    Custom(&'static [u8])
   }
 
   pub use self::CType::*;
@@ -595,6 +596,7 @@ pub mod proto {
         &UChar      => b"unsigned char",
         &SizeT      => b"size_t",
         &UInt       => b"unsigned int",
+        &Custom(ref s) => s,
       }) // write_all(match...)
     } // generate_cpp
 
@@ -606,6 +608,7 @@ pub mod proto {
         &UChar      => b"c_uchar",
         &SizeT      => b"size_t",
         &UInt       => b"c_uint",
+        &Custom(_)  => b"c_void",
       }) // write_all(match...)
     } // generate_rs
   }

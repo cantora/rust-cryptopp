@@ -8,7 +8,7 @@ pub struct Integer {
 
 impl Drop for Integer {
   fn drop(&mut self) {
-    unsafe { cpp::delete_Integer(self.ctx) };
+    unsafe { cpp::del_Integer(self.ctx) };
   }
 }
 

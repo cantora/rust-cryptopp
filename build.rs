@@ -29,7 +29,13 @@ fn gen_classes(mut ctx: gen::Context<File, File>) -> io::Result<()> {
     }
   })));
 
-  ctx.generate(class!(b"SHA3_256" => {
+  try!(ctx.generate(class!(b"SHA3_256" => {
+    constructors {
+      b"";
+    }
+  })));
+
+  ctx.generate(class!(b"Integer" => {
     constructors {
       b"";
     }
@@ -43,6 +49,7 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
 
   try!(cpp_stream.write_all(b"#include <cryptopp/cryptlib.h>\n"));
   try!(cpp_stream.write_all(b"#include <cryptopp/sha3.h>\n"));
+  try!(cpp_stream.write_all(b"#include <cryptopp/integer.h>\n"));
   try!(cpp_stream.write_all(b"using namespace CryptoPP;\n\n"));
 
   let mut rs_stream = try!(File::create(rust_path));
