@@ -52,7 +52,7 @@ impl FunctionArgs {
     }
   }
 
-  pub fn generate_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
+  pub fn generate_proto_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -71,7 +71,29 @@ impl FunctionArgs {
     Ok(())
   }
 
-  pub fn generate_rs(&self, out_stream: &mut Write) -> io::Result<()> {
+  pub fn generate_apply_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
+    if let Some(slice) = self.as_slice() {
+      let mut i = 0u32;
+
+      for btype in slice.iter() {
+        if i > 0 {
+          try!(out_stream.write_all(b", "));
+        }
+
+        try!(out_stream.write_all(b" "));
+        if btype.is_ref() {
+          try!(out_stream.write_all(b"*"));
+        }
+
+        try!(write!(out_stream, "arg{}", i));
+        i += 1;
+      }
+    }
+
+    Ok(())
+  }
+
+  pub fn generate_proto_rs(&self, out_stream: &mut Write) -> io::Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -146,16 +168,6 @@ impl<'a> NamedClass<'a> {
     }
   }
 }
-
-//pub enum BindingType {
-//  MutableMethod,
-//  ConstMethod,
-//}
-//
-//pub struct BindingCtx {
-//  pub cls: Class,
-//  pub binding_type: 
-//}
 
 #[macro_export]
 macro_rules! class_bindings_block {
@@ -293,9 +305,8 @@ impl Class {
 
       try!(out_stream.write_all(b"("));
 
-      let arg_len = ctor_args.len();
-      if arg_len > 0 {
-        try!(ctor_args.generate_cpp(out_stream));
+      if ctor_args.len() > 0 {
+        try!(ctor_args.generate_proto_cpp(out_stream));
       }
 
       try!(out_stream.write_all(b")"));
@@ -307,12 +318,7 @@ impl Class {
 
       try!(out_stream.write_all(b"("));
 
-      for i in (0..arg_len) {
-        if i > 0 {
-          try!(out_stream.write_all(b", "));
-        }
-        try!(write!(out_stream, "arg{}", i));
-      }
+      try!(ctor_args.generate_apply_cpp(out_stream));
 
       try!(out_stream.write_all(b");\n"));
       try!(out_stream.write_all(b"}"));
@@ -358,10 +364,9 @@ impl Class {
       try!(out_stream.write_all(b"*"));
       try!(out_stream.write_all(b" ctx"));
 
-      let arg_len = function_desc.args.len();
-      if arg_len > 0 {
+      if function_desc.args.len() > 0 {
         try!(out_stream.write_all(b", "));
-        try!(function_desc.args.generate_cpp(out_stream));
+        try!(function_desc.args.generate_proto_cpp(out_stream));
       }
       try!(out_stream.write_all(b")"));
 
@@ -373,12 +378,7 @@ impl Class {
       try!(out_stream.write_all(method_name));
       try!(out_stream.write_all(b"("));
 
-      for i in (0..arg_len) {
-        if i > 0 {
-          try!(out_stream.write_all(b", "));
-        }
-        try!(write!(out_stream, "arg{}", i));
-      }
+      try!(function_desc.args.generate_apply_cpp(out_stream));
 
       try!(out_stream.write_all(b");\n"));
       try!(out_stream.write_all(b"}"));
@@ -422,9 +422,8 @@ impl Class {
 
       try!(out_stream.write_all(b"("));
 
-      let arg_len = ctor_args.len();
-      if arg_len > 0 {
-        try!(ctor_args.generate_rs(out_stream));
+      if ctor_args.len() > 0 {
+        try!(ctor_args.generate_proto_rs(out_stream));
       }
 
       try!(out_stream.write_all(b")"));
@@ -464,7 +463,7 @@ impl Class {
       let arg_len = function_desc.args.len();
       if arg_len > 0 {
         try!(out_stream.write_all(b", "));
-        try!(function_desc.args.generate_rs(out_stream));
+        try!(function_desc.args.generate_proto_rs(out_stream));
       }
 
       try!(out_stream.write_all(b")"));
@@ -531,7 +530,9 @@ pub mod proto {
   pub enum BasicType {
     Simple(CType),
     MutPointer(CType),
-    ConstPointer(CType)
+    ConstPointer(CType),
+    MutRef(CType),
+    ConstRef(CType)
   }
 
   impl BasicType {
@@ -544,16 +545,27 @@ pub mod proto {
       false
     }
 
+    pub fn is_ref(&self) -> bool {
+      use self::BasicType::*;
+      match self {
+        &MutRef(_)   |
+        &ConstRef(_) => true,
+        _            => false
+      }
+    }
+
     pub fn generate_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
       use self::BasicType::*;
 
       match self {
         &Simple(ref t)       => t.generate_cpp(out_stream),
-        &MutPointer(ref t)   => {
+        &MutPointer(ref t)   |
+        &MutRef(ref t)       => {
           try!(t.generate_cpp(out_stream));
           out_stream.write_all(b"*")
         },
-        &ConstPointer(ref t) => {
+        &ConstPointer(ref t) |
+        &ConstRef(ref t)     => {
           try!(t.generate_cpp(out_stream));
           out_stream.write_all(b" const*")
         }
@@ -565,11 +577,13 @@ pub mod proto {
 
       match self {
         &Simple(ref t)       => t.generate_rs(out_stream),
-        &MutPointer(ref t)   => {
+        &MutPointer(ref t)   |
+        &MutRef(ref t)       => {
           try!(out_stream.write_all(b"*mut "));
           t.generate_rs(out_stream)
         },
-        &ConstPointer(ref t) => {
+        &ConstPointer(ref t) |
+        &ConstRef(ref t)     => {
           try!(out_stream.write_all(b"*const "));
           t.generate_rs(out_stream)
         }
@@ -631,6 +645,10 @@ pub mod proto {
 
   pub fn const_ptr(t: CType) -> BasicType {
     BasicType::ConstPointer(t)
+  }
+
+  pub fn const_ref(t: CType) -> BasicType {
+    BasicType::ConstRef(t)
   }
 }
 //#define RCPP_NEW(rcpp_t) \

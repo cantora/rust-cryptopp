@@ -7,6 +7,4 @@ using namespace CryptoPP;
 RCPP_ENUM(Integer_UNSIGNED, Integer::UNSIGNED)
 RCPP_ENUM(Integer_SIGNED,   Integer::SIGNED)
 
-RCPP_COPY(Integer)
-
 RCPP_NEW1(from_long, Integer, signed long)
