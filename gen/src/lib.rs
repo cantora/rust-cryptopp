@@ -2,21 +2,37 @@ use std::collections::hash_map::HashMap;
 use std::io;
 use std::io::Write;
 
-pub struct Context<T, U> {
+pub struct Context<T, U, V> {
   cpp_stream: T,
-  rs_stream: U
+  rs_binding_stream: U,
+  rs_code_stream: V,
 }
 
-impl<T: Write, U: Write> Context<T, U> {
-  pub fn new(cpp_stream: T, rs_stream: U) -> Context<T, U> {
-    Context { cpp_stream: cpp_stream, rs_stream: rs_stream }
+impl<T: Write, U: Write, V: Write> Context<T, U, V> {
+  pub fn new(cpp_stream: T,
+             rs_binding_stream: U,
+             rs_code_stream: V) -> Context<T, U, V> {
+    Context {
+      cpp_stream: cpp_stream,
+      rs_binding_stream: rs_binding_stream,
+      rs_code_stream: rs_code_stream
+    }
   }
 
   pub fn generate<'a>(&mut self, class: NamedClass<'a>) -> io::Result<()> {
-    class.anon_class.generate(&class.namespace,
-                              class.name,
-                              &mut self.cpp_stream,
-                              &mut self.rs_stream)
+    try!(class.anon_class.generate(&class.namespace,
+                                   class.name,
+                                   &mut self.cpp_stream,
+                                   &mut self.rs_binding_stream));
+
+    if let Some(ref rs_struct) = class.rs_struct {
+      try!(class.anon_class.generate_rs_struct(&class.namespace,
+                                               &class.name,
+                                               rs_struct,
+                                               &mut self.rs_code_stream));
+    }
+
+    Ok(())
   }
 }
 
@@ -151,10 +167,15 @@ macro_rules! class {
   });
 }
 
+pub struct RSStruct<'a> {
+  name: &'a [u8]
+}
+
 pub struct NamedClass<'a> {
   pub namespace:  Vec<&'a [u8]>,
   pub name:       &'a [u8],
-  pub anon_class: Class
+  pub anon_class: Class,
+  pub rs_struct:  Option<RSStruct<'a>>
 }
 
 impl<'a> NamedClass<'a> {
@@ -164,8 +185,13 @@ impl<'a> NamedClass<'a> {
     NamedClass {
       namespace: namespace,
       name: name,
-      anon_class: anon_class
+      anon_class: anon_class,
+      rs_struct: None,
     }
+  }
+
+  pub fn translate_to_rs_struct(&mut self, name: &'a [u8]) {
+    self.rs_struct = Some(RSStruct { name: name })
   }
 }
 
@@ -474,6 +500,35 @@ impl Class {
       }
       try!(out_stream.write_all(b";\n"));
     }
+
+    Ok(())
+  }
+
+  fn generate_rs_struct(&self,
+                        namespace: &Vec<&[u8]>,
+                        name: &[u8],
+                        rs_struct: &RSStruct,
+                        out_stream: &mut Write) -> io::Result<()> {
+    try!(out_stream.write_all(b"pub struct "));
+    try!(out_stream.write_all(rs_struct.name));
+    try!(out_stream.write_all(b" {\n  ctx: *mut c_void\n}\n"));
+
+    try!(out_stream.write_all(b"impl Drop for "));
+    try!(out_stream.write_all(rs_struct.name));
+    try!(out_stream.write_all(b" {\n  fn drop(&mut self) {\n"));
+    try!(out_stream.write_all(b"    unsafe { cpp::del_"));
+    try!(generate_c_path(namespace, name, out_stream));
+    try!(out_stream.write_all(b"(self.ctx) };\n  }\n}\n"));
+
+    try!(out_stream.write_all(b"impl "));
+    try!(out_stream.write_all(rs_struct.name));
+    try!(out_stream.write_all(b" {\n  pub fn new() -> "));
+    try!(out_stream.write_all(rs_struct.name));
+    try!(out_stream.write_all(b" {\n    let ctx = unsafe { cpp::new_"));
+    try!(generate_c_path(namespace, name, out_stream));
+    try!(out_stream.write_all(b"() };\n\n    "));
+    try!(out_stream.write_all(rs_struct.name));
+    try!(out_stream.write_all(b" { ctx: ctx }\n  }\n}\n\n"));
 
     Ok(())
   }

@@ -2,25 +2,9 @@ use libc::{c_void, size_t};
 
 use cpp;
 
-pub struct Sha3 {
-  ctx: *mut c_void
-}
-
-impl Drop for Sha3 {
-  fn drop(&mut self) {
-    unsafe { cpp::del_SHA3_256(self.ctx) };
-  }
-}
+include!(concat!(env!("OUT_DIR"), "/generated_code.rs"));
 
 impl Sha3 {
-  pub fn new() -> Sha3 {
-    let ctx = unsafe {
-      cpp::new_SHA3_256()
-    };
-
-    Sha3 { ctx: ctx }
-  }
-
   pub fn update(&mut self, data: &[u8]) {
     unsafe {
       cpp::mth_HashTransformation_Update(self.ctx,
