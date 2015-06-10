@@ -62,15 +62,13 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
 }
  
 fn main() {
-  use std::fs;
-
   let cryptopp_lib = find_cryptopp();
   println!("cryptopp: {:?}", cryptopp_lib);
 
   let out_dir = std::env::var("OUT_DIR").unwrap();
   let out_path = std::path::Path::new(&out_dir);
-  let rust_src = out_path.join("gen.rs");
-  let cpp_src = out_path.join("gen.cpp");
+  let rust_src = out_path.join("generated_bindings.rs");
+  let cpp_src = out_path.join("generated_cpp.cpp");
 
   gen_cpp_code(&cpp_src, &rust_src).unwrap();
 
@@ -78,21 +76,6 @@ fn main() {
   config.cpp(true);
 
   config.file(&cpp_src);
-
-  for dent in fs::read_dir("src/cpp").unwrap() {
-    let path = dent.unwrap().path();
-    let item = fs::metadata(&path).unwrap();
-    if !item.is_file() {
-      continue;
-    }
-
-    if let Some(ref ext) = path.extension() {
-      if *ext == "cpp" {
-        println!("{:?}", path);
-        config.file(&path);
-      }
-    }
-  }
 
   config.compile("librustcryptopp.a");
 }
