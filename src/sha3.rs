@@ -2,7 +2,7 @@ use libc::{c_void, size_t};
 
 use cpp;
 
-include!(concat!(env!("OUT_DIR"), "/generated_code.rs"));
+include!(concat!(env!("OUT_DIR"), "/SHA3_256.rs"));
 
 impl Sha3 {
   pub fn update(&mut self, data: &[u8]) {

@@ -1,38 +1,49 @@
 use std::collections::hash_map::HashMap;
 use std::io;
 use std::io::Write;
+use std::convert::From;
+use std::error;
 
-pub struct Context<T, U, V> {
-  cpp_stream: T,
-  rs_binding_stream: U,
-  rs_code_stream: V,
+#[derive(Debug)]
+pub enum Error {
+  IO(io::Error),
+  Unexpected(String)
 }
 
-impl<T: Write, U: Write, V: Write> Context<T, U, V> {
+pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<io::Error> for Error {
+  fn from(e: io::Error) -> Error {
+    Error::IO(e)
+  }
+}
+
+impl From<std::string::FromUtf8Error> for Error {
+  fn from(e: std::string::FromUtf8Error) -> Error {
+    let desc = error::Error::description(&e);
+    Error::Unexpected(String::from(desc))
+  }
+}
+
+pub struct Context<T, U> {
+  cpp_stream: T,
+  rs_binding_stream: U
+}
+
+impl<T: Write, U: Write> Context<T, U> {
   pub fn new(cpp_stream: T,
-             rs_binding_stream: U,
-             rs_code_stream: V) -> Context<T, U, V> {
+             rs_binding_stream: U) -> Context<T, U> {
     Context {
       cpp_stream: cpp_stream,
-      rs_binding_stream: rs_binding_stream,
-      rs_code_stream: rs_code_stream
+      rs_binding_stream: rs_binding_stream
     }
   }
 
-  pub fn generate<'a>(&mut self, class: NamedClass<'a>) -> io::Result<()> {
-    try!(class.anon_class.generate(&class.namespace,
-                                   class.name,
-                                   &mut self.cpp_stream,
-                                   &mut self.rs_binding_stream));
-
-    if let Some(ref rs_struct) = class.rs_struct {
-      try!(class.anon_class.generate_rs_struct(&class.namespace,
-                                               &class.name,
-                                               rs_struct,
-                                               &mut self.rs_code_stream));
-    }
-
-    Ok(())
+  pub fn generate<'a>(&mut self, class: &NamedClass<'a>) -> Result<()> {
+    class.anon_class.generate(&class.namespace,
+                              class.name,
+                              &mut self.cpp_stream,
+                              &mut self.rs_binding_stream)
   }
 }
 
@@ -68,7 +79,7 @@ impl FunctionArgs {
     }
   }
 
-  pub fn generate_proto_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
+  pub fn generate_proto_cpp(&self, out_stream: &mut Write) -> Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -87,7 +98,7 @@ impl FunctionArgs {
     Ok(())
   }
 
-  pub fn generate_apply_cpp(&self, out_stream: &mut Write) -> io::Result<()> {
+  pub fn generate_apply_cpp(&self, out_stream: &mut Write) -> Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -109,7 +120,7 @@ impl FunctionArgs {
     Ok(())
   }
 
-  pub fn generate_proto_rs(&self, out_stream: &mut Write) -> io::Result<()> {
+  pub fn generate_proto_rs(&self, out_stream: &mut Write) -> Result<()> {
     if let Some(slice) = self.as_slice() {
       let mut i = 0u32;
 
@@ -167,15 +178,10 @@ macro_rules! class {
   });
 }
 
-pub struct RSStruct<'a> {
-  name: &'a [u8]
-}
-
 pub struct NamedClass<'a> {
   pub namespace:  Vec<&'a [u8]>,
   pub name:       &'a [u8],
   pub anon_class: Class,
-  pub rs_struct:  Option<RSStruct<'a>>
 }
 
 impl<'a> NamedClass<'a> {
@@ -186,13 +192,53 @@ impl<'a> NamedClass<'a> {
       namespace: namespace,
       name: name,
       anon_class: anon_class,
-      rs_struct: None,
     }
   }
 
-  pub fn translate_to_rs_struct(&mut self, name: &'a [u8]) {
-    self.rs_struct = Some(RSStruct { name: name })
+  pub fn c_path(&self) -> Result<String> {
+    let mut c_path: Vec<u8> = Vec::new();
+    try!(generate_c_path(&self.namespace, self.name, &mut c_path));
+    let s = try!(String::from_utf8(c_path));
+
+    Ok(s)
   }
+
+  pub fn generate_struct(&self,
+                         filepath: &std::path::Path,
+                         name: &'a [u8]) -> Result<()> {
+    use std::fs::File;
+
+    let mut fname = try!(self.c_path());
+    fname.push_str(".rs");
+    let mut stream = try!(File::create(filepath.join(fname)));
+    self.write_struct(name, &mut stream)
+  }
+
+  pub fn write_struct<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
+    try!(stream.write_all(b"pub struct "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n  ctx: *mut c_void\n}\n"));
+
+    try!(stream.write_all(b"impl Drop for "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n  fn drop(&mut self) {\n"));
+    try!(stream.write_all(b"    unsafe { cpp::del_"));
+    try!(generate_c_path(&self.namespace, self.name, &mut stream));
+    try!(stream.write_all(b"(self.ctx) };\n  }\n}\n"));
+
+    try!(stream.write_all(b"impl "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n  pub fn new() -> "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n    let ctx = unsafe { cpp::new_"));
+    try!(generate_c_path(&self.namespace, self.name, &mut stream));
+    try!(stream.write_all(b"() };\n\n    "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" { ctx: ctx }\n  }\n}\n\n"));
+
+    Ok(())
+  }
+
 }
 
 #[macro_export]
@@ -272,24 +318,40 @@ pub fn class() -> Class {
   }
 }
 
+fn c_path_ns_part(ns_part: &[u8], out: &mut Write) -> Result<()> {
+  for b in ns_part {
+    if *b == 0x5f {
+      try!(out.write_all(b"__"));
+    } else {
+      try!(out.write_all(&[*b]));
+    }
+  }
+
+  Ok(())
+}
+
 fn generate_c_path(namespace: &Vec<&[u8]>,
                    name: &[u8],
-                   out: &mut Write) -> io::Result<()> {
+                   out: &mut Write) -> Result<()> {
   for ns_part in namespace.iter() {
-    try!(out.write_all(ns_part));
+    try!(c_path_ns_part(ns_part, out));
     try!(out.write_all(b"_"));
   }
-  out.write_all(name)
+  try!(out.write_all(name));
+
+  Ok(())
 }
 
 fn generate_cpp_path(namespace: &Vec<&[u8]>,
                     name: &[u8],
-                    out: &mut Write) -> io::Result<()> {
+                    out: &mut Write) -> Result<()> {
   for ns_part in namespace.iter() {
     try!(out.write_all(ns_part));
     try!(out.write_all(b"::"));
   }
-  out.write_all(name)
+  try!(out.write_all(name));
+
+  Ok(())
 }
 
 impl Class {
@@ -307,7 +369,7 @@ impl Class {
   pub fn generate_cpp(&self,
                       namespace: &Vec<&[u8]>,
                       name: &[u8],
-                      out_stream: &mut Write) -> io::Result<()> {
+                      out_stream: &mut Write) -> Result<()> {
     try!(self.generate_cpp_ctors(namespace, name, out_stream));
     self.generate_cpp_methods(namespace, name, out_stream)
   }
@@ -315,7 +377,7 @@ impl Class {
   fn generate_cpp_ctors(&self,
                         namespace: &Vec<&[u8]>,
                         name: &[u8],
-                        out_stream: &mut Write) -> io::Result<()> {
+                        out_stream: &mut Write) -> Result<()> {
     for (ctor_name, ctor_args) in self.ctors.iter() {
       try!(out_stream.write_all(b"extern \"C\"\n"));
 
@@ -369,7 +431,7 @@ impl Class {
   fn generate_cpp_methods(&self,
                           namespace: &Vec<&[u8]>,
                           name: &[u8],
-                          out_stream: &mut Write) -> io::Result<()> {
+                          out_stream: &mut Write) -> Result<()> {
     for (method_name, method_desc) in self.methods.iter() {
       let function_desc = &method_desc.func;
 
@@ -417,7 +479,7 @@ impl Class {
   pub fn generate_rs(&self,
                      namespace: &Vec<&[u8]>,
                      name: &[u8],
-                     out_stream: &mut Write) -> io::Result<()> {
+                     out_stream: &mut Write) -> Result<()> {
     try!(out_stream.write_all(
       b"extern {\n"
     ));
@@ -433,7 +495,7 @@ impl Class {
   fn generate_rs_ctors(&self,
                        namespace: &Vec<&[u8]>,
                        name: &[u8],
-                       out_stream: &mut Write) -> io::Result<()> {
+                       out_stream: &mut Write) -> Result<()> {
     if self.ctors.len() < 1 {
       return Ok(())
     }
@@ -467,7 +529,7 @@ impl Class {
   fn generate_rs_methods(&self,
                          namespace: &Vec<&[u8]>,
                          name: &[u8],
-                         out_stream: &mut Write) -> io::Result<()> {
+                         out_stream: &mut Write) -> Result<()> {
     for (method_name, method_desc) in self.methods.iter() {
       let function_desc = &method_desc.func;
 
@@ -504,40 +566,11 @@ impl Class {
     Ok(())
   }
 
-  fn generate_rs_struct(&self,
-                        namespace: &Vec<&[u8]>,
-                        name: &[u8],
-                        rs_struct: &RSStruct,
-                        out_stream: &mut Write) -> io::Result<()> {
-    try!(out_stream.write_all(b"pub struct "));
-    try!(out_stream.write_all(rs_struct.name));
-    try!(out_stream.write_all(b" {\n  ctx: *mut c_void\n}\n"));
-
-    try!(out_stream.write_all(b"impl Drop for "));
-    try!(out_stream.write_all(rs_struct.name));
-    try!(out_stream.write_all(b" {\n  fn drop(&mut self) {\n"));
-    try!(out_stream.write_all(b"    unsafe { cpp::del_"));
-    try!(generate_c_path(namespace, name, out_stream));
-    try!(out_stream.write_all(b"(self.ctx) };\n  }\n}\n"));
-
-    try!(out_stream.write_all(b"impl "));
-    try!(out_stream.write_all(rs_struct.name));
-    try!(out_stream.write_all(b" {\n  pub fn new() -> "));
-    try!(out_stream.write_all(rs_struct.name));
-    try!(out_stream.write_all(b" {\n    let ctx = unsafe { cpp::new_"));
-    try!(generate_c_path(namespace, name, out_stream));
-    try!(out_stream.write_all(b"() };\n\n    "));
-    try!(out_stream.write_all(rs_struct.name));
-    try!(out_stream.write_all(b" { ctx: ctx }\n  }\n}\n\n"));
-
-    Ok(())
-  }
-
   pub fn generate(&self,
               namespace: &Vec<&[u8]>,
               name: &[u8],
               cpp_stream: &mut Write,
-              rs_stream: &mut Write) -> io::Result<()> {
+              rs_stream: &mut Write) -> Result<()> {
     try!(self.generate_cpp(&namespace, name, cpp_stream));
     self.generate_rs(&namespace, name, rs_stream)
   }
