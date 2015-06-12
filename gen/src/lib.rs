@@ -3,6 +3,7 @@ use std::io;
 use std::io::Write;
 use std::convert::From;
 use std::error;
+use std::fs::File;
 
 #[derive(Debug)]
 pub enum Error {
@@ -203,14 +204,18 @@ impl<'a> NamedClass<'a> {
     Ok(s)
   }
 
+  fn fstream_from_c_path(&self, filepath: &std::path::Path) -> Result<File> {
+    let mut fname = try!(self.c_path());
+    fname.push_str(".rs");
+    let stream = try!(File::create(filepath.join(fname)));
+
+    Ok(stream)
+  }
+
   pub fn generate_struct(&self,
                          filepath: &std::path::Path,
                          name: &'a [u8]) -> Result<()> {
-    use std::fs::File;
-
-    let mut fname = try!(self.c_path());
-    fname.push_str(".rs");
-    let mut stream = try!(File::create(filepath.join(fname)));
+    let mut stream = try!(self.fstream_from_c_path(filepath));
     self.write_struct(name, &mut stream)
   }
 
@@ -239,6 +244,16 @@ impl<'a> NamedClass<'a> {
     Ok(())
   }
 
+  pub fn generate_trait(&self,
+                        filepath: &std::path::Path,
+                        name: &'a [u8]) -> Result<()> {
+    let mut stream = try!(self.fstream_from_c_path(filepath));
+    self.write_trait(name, &mut stream)
+  }
+
+  pub fn write_trait<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
+    unimplemented!()
+  }
 }
 
 #[macro_export]
@@ -255,21 +270,20 @@ macro_rules! class_bindings {
     $cls
   );
 
-  ($cls:expr, mutable methods { $( $t:tt )* } $( $rest:tt )* ) => ({
-    let cls = class_methods!($cls, false, $( $t )*);
+  ($cls:expr, mutable methods { $( $t:tt )* }  $( $rest:tt )* ) => ({
+    let mut cls = class_methods!($cls, false, $( $t )*);
     class_bindings!(cls, $( $rest )* )
   });
 
-  ($cls:expr, constant methods { $( $t:tt )* } $( $rest:tt )* ) => ({
-    let cls = class_methods!($cls, true, $( $rest )*);
+  ($cls:expr, constant methods { $( $t:tt )* }  $( $rest:tt )* ) => ({
+    let mut cls = class_methods!($cls, true, $( $t )*);
     class_bindings!(cls, $( $rest )* )
   });
 
-  ($cls:expr, constructors { $( $t:tt )* } $( $rest:tt )* ) => ({
-    let cls = class_ctors!($cls, $( $t )*);
+  ($cls:expr, constructors { $( $t:tt )* }  $( $rest:tt )* ) => ({
+    let mut cls = class_ctors!($cls, $( $t )*);
     class_bindings!(cls, $( $rest )* )
   });
-
 }
 
 #[macro_export]

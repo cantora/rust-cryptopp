@@ -41,16 +41,18 @@ fn gen_classes(mut ctx: gen::Context<File, File>,
                out_path: &std::path::Path) -> gen::Result<()> {
   use gen::proto::*;
 
-  try!(ctx.generate(&class!(b"HashTransformation" => {
+  
+  let ht = class!(b"HashTransformation" => {
+    constant methods {
+      uint(), b"DigestSize";
+    }
     mutable methods {
       void(), b"Update",     const_ptr(UChar), size_t();
       void(), b"Final",      mut_ptr(UChar);
       void(), b"Restart";
     }
-    constant methods {
-      uint(), b"DigestSize";
-    }
-  })));
+  });
+  try!(ctx.generate(&ht));
 
   let sha3 = class!(b"SHA3_256" => {
     constructors {
