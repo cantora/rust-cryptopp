@@ -4,24 +4,38 @@ use cpp;
 
 include!(concat!(env!("OUT_DIR"), "/SHA3_256.rs"));
 
-impl Sha3 {
-  pub fn update(&mut self, data: &[u8]) {
+pub trait CPPContext {
+  fn mut_ctx(&self) -> *mut c_void;
+  fn ctx(&self) -> *const c_void {
+    self.mut_ctx()
+  }
+}
+
+impl CPPContext for Sha3 {
+  fn mut_ctx(&self) -> *mut c_void {
+    self.ctx
+  }
+}
+
+pub trait HashTransformation : CPPContext {
+  fn update(&mut self, data: &[u8]) {
     unsafe {
-      cpp::mth_HashTransformation_Update(self.ctx,
-                                     data.as_ptr(),
-                                     data.len() as size_t)
+      cpp::mth_HashTransformation_Update(self.mut_ctx(),
+                                         data.as_ptr(),
+                                         data.len() as size_t)
     };
   }
 
-  pub fn digest(&mut self) -> [u8; 32] {
+  fn digest(&mut self) -> [u8; 32] {
     let mut output = [0; 32];
     unsafe {
-      cpp::mth_HashTransformation_Final(self.ctx, output.as_mut_ptr())
+      cpp::mth_HashTransformation_Final(self.mut_ctx(), output.as_mut_ptr())
     };
     output
   }
 }
 
+impl HashTransformation for Sha3 {}
 
 pub fn new() -> Sha3 {
   Sha3::new()
@@ -57,6 +71,7 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> [u8; 32] {
 mod test {
   extern crate rustc_serialize;
   use self::rustc_serialize::hex::FromHex;
+  use super::HashTransformation;
 
   #[test]
   fn sanity() {
