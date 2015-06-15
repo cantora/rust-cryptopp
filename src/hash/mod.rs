@@ -1,4 +1,5 @@
 use libc::{c_void, size_t};
+use std::default::Default;
 
 use cpp;
 
@@ -55,6 +56,7 @@ impl DigestSize {
 }
 
 pub trait Function : cpp::CPPContext {
+  /// updates the hash function state with input data.
   fn update(&mut self, data: &[u8]) {
     unsafe {
       cpp::mth_HashTransformation_Update(self.mut_ctx(),
@@ -63,7 +65,8 @@ pub trait Function : cpp::CPPContext {
     };
   }
 
-  fn digest(&mut self) -> [u8; 32] {
+  /// returns the digest and resets the hash function state.
+  fn finalize(&mut self) -> [u8; 32] {
     let mut output = [0; 32];
     unsafe {
       cpp::mth_HashTransformation_Final(self.mut_ctx(), output.as_mut_ptr())
@@ -71,10 +74,19 @@ pub trait Function : cpp::CPPContext {
     output
   }
 
-  fn len(&self) -> DigestSize {
+  /// the digest size.
+  fn size(&self) -> DigestSize {
     DigestSize::from_size_in_bytes(unsafe {
       cpp::mth_HashTransformation_DigestSize(self.ctx())
     })
+  }
+}
+
+pub trait Digest : Function + Default {
+  fn digest(data: &[u8]) -> [u8; 32] {
+    let hash_fn = &mut Self::default();
+    hash_fn.update(data);
+    hash_fn.finalize()
   }
 }
 
@@ -90,7 +102,7 @@ mod test {
     assert_eq!(ds1.in_bits(), 224);
     assert_eq!(ds1.in_bytes().unwrap(), 28);
 
-    let ds2 = DS::from_size_in_bits(256);
+    let ds2 = DS::from_size_in_bytes(32);
     assert_eq!(ds2, DS::Bits256);
     assert_eq!(ds2.in_bits(), 256);
     assert_eq!(ds2.in_bytes().unwrap(), 32);

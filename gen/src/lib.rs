@@ -233,6 +233,8 @@ impl<'a> NamedClass<'a> {
   }
 
   pub fn write_struct<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
+    try!(stream.write_all(b"use std;\n\n"));
+
     try!(stream.write_all(b"pub struct "));
     try!(stream.write_all(name));
     try!(stream.write_all(b" {\n  ctx: *mut c_void\n}\n"));
@@ -257,6 +259,15 @@ impl<'a> NamedClass<'a> {
     try!(stream.write_all(b"impl cpp::CPPContext for "));
     try!(stream.write_all(name));
     try!(stream.write_all(b" {\n  fn mut_ctx(&self) -> *mut c_void { self.ctx }\n}"));
+    try!(stream.write_all(b"\n\n"));
+
+    try!(stream.write_all(b"impl std::default::Default for "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n  fn default() -> "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" { "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b"::new() }\n}"));
     try!(stream.write_all(b"\n\n"));
 
     Ok(())

@@ -2,19 +2,19 @@ use libc::{c_void, size_t};
 
 use cpp;
 use hash::Function;
+use hash::Digest;
 
 include!(concat!(env!("OUT_DIR"), "/SHA3_256.rs"));
 
 impl Function for Sha3 {}
+impl Digest for Sha3 {}
 
 pub fn new() -> Sha3 {
   Sha3::new()
 }
 
 pub fn digest(msg: &[u8]) -> [u8; 32] {
-  let mut sha3 = Sha3::new();
-  sha3.update(msg);
-  sha3.digest()
+  Sha3::digest(msg)
 }
 
 /// produce a keccak hmac; that is, an hmac done insecurely but its
@@ -34,13 +34,14 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> [u8; 32] {
 
   keccak.update(secret);
   keccak.update(msg);
-  keccak.digest()
+  keccak.finalize()
 }
 
 #[cfg(test)]
 mod test {
   extern crate rustc_serialize;
   use self::rustc_serialize::hex::FromHex;
+  use hash::DigestSize;
   use hash::Function;
 
   #[test]
@@ -52,8 +53,9 @@ mod test {
     ).unwrap();
     let expected_bs = &expected[..];
 
+    assert_eq!(sha3.size(), DigestSize::Bits256);
     sha3.update(msg);
-    let dgst = sha3.digest();
+    let dgst = sha3.finalize();
 
     assert_eq!(&dgst[..], expected_bs);
 
