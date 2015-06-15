@@ -98,10 +98,16 @@ pub trait Digest : Function + Default {
     hash_fn.update(data);
     hash_fn.finalize()
   }
+
+  fn empty_digest() -> [u8; 32] {
+    Self::digest(b"")
+  }
 }
 
 #[cfg(test)]
 mod test {
+  use super::Digest;
+  use super::Function;
 
   #[test]
   fn digest_size_sanity() {
@@ -117,4 +123,32 @@ mod test {
     assert_eq!(ds2.in_bits(), 256);
     assert_eq!(ds2.in_bytes().unwrap(), 32);
   }
+
+  pub fn reset<T: Digest>(mut d: T) {
+    d.reset();
+    assert_eq!(d.finalize(), T::empty_digest());
+
+    d.update(b"    assert_eq!(d.finalize(), T::empty_digest());");
+    d.reset();
+    assert_eq!(d.finalize(), T::empty_digest());
+  }
+
+  pub fn finalize<T: Digest>(mut d: T) {
+    d.reset();
+    assert_eq!(d.finalize(), T::empty_digest());
+
+    d.update(b"asdofijqwoeirj");
+    d.finalize();
+
+    assert_eq!(d.finalize(), T::empty_digest());
+  }
+
+  pub fn update<T: Digest>(mut d: T) {
+    d.reset();
+    assert_eq!(d.finalize(), T::empty_digest());
+
+    d.update(b"");
+    assert_eq!(d.finalize(), T::empty_digest());
+  }
+
 }

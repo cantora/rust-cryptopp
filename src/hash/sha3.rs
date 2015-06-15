@@ -17,6 +17,18 @@ pub fn digest(msg: &[u8]) -> [u8; 32] {
   Sha3::digest(msg)
 }
 
+#[cfg(test)]
+mod hash_test {
+ #[test]
+  fn all() {
+    use hash;
+
+    hash::test::reset(super::new());
+    hash::test::finalize(super::new());
+    hash::test::update(super::new());
+  }
+}
+
 /// produce a keccak hmac; that is, an hmac done insecurely but its
 /// ok because keccak is crazy like that.
 /// http://en.wikipedia.org/wiki/Hash-based_message_authentication_code
@@ -39,38 +51,45 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> [u8; 32] {
 
 #[cfg(test)]
 mod test {
-  extern crate rustc_serialize;
-  use self::rustc_serialize::hex::FromHex;
   use hash::DigestSize;
   use hash::Function;
+  use hash::Digest;
 
   #[test]
   fn sanity() {
     let mut sha3 = super::new();
     let msg      = b"abc";
-    let expected = FromHex::from_hex(
-      "4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45"
-    ).unwrap();
-    let expected_bs = &expected[..];
+    let expected = [0x4e, 0x03, 0x65, 0x7a, 0xea, 0x45, 0xa9, 0x4f,
+                    0xc7, 0xd4, 0x7b, 0xa8, 0x26, 0xc8, 0xd6, 0x67,
+                    0xc0, 0xd1, 0xe6, 0xe3, 0x3a, 0x64, 0xa0, 0x36,
+                    0xec, 0x44, 0xf5, 0x8f, 0xa1, 0x2d, 0x6c, 0x45];
 
     assert_eq!(sha3.size(), DigestSize::Bits256);
+
     sha3.update(msg);
-    let dgst = sha3.finalize();
+    assert_eq!(sha3.finalize(), expected);
 
-    assert_eq!(&dgst[..], expected_bs);
-
-    assert_eq!(super::digest(msg), expected_bs);
+    assert_eq!(super::digest(msg), expected);
 
     let msg2 = b"uchk uchk chk uchk ucka chka chuk";
-    let expected2 = FromHex::from_hex(
-      "c51a4640694d14916a82ddd666d4ea63158745ed99e6cad1331f39c57e3abe37"
-    ).unwrap();
-    let expected2_bs = &expected2[..];
+    let expected2 = [0xc5, 0x1a, 0x46, 0x40, 0x69, 0x4d, 0x14, 0x91,
+                     0x6a, 0x82, 0xdd, 0xd6, 0x66, 0xd4, 0xea, 0x63,
+                     0x15, 0x87, 0x45, 0xed, 0x99, 0xe6, 0xca, 0xd1,
+                     0x33, 0x1f, 0x39, 0xc5, 0x7e, 0x3a, 0xbe, 0x37];
 
-    assert_eq!(super::digest(msg2), expected2_bs);    
+    assert_eq!(super::digest(msg2), expected2);    
 
-    assert_eq!(super::keccak_mac(&msg2[..16], &msg2[16..]),
-               expected2_bs);
+    assert_eq!(super::keccak_mac(&msg2[..16], &msg2[16..]), expected2);
+  }
+
+
+  #[test]
+  fn digest_empty_digest() {
+    let empty_hash = [0xc5, 0xd2, 0x46, 0x01, 0x86, 0xf7, 0x23, 0x3c,
+                      0x92, 0x7e, 0x7d, 0xb2, 0xdc, 0xc7, 0x03, 0xc0,
+                      0xe5, 0x00, 0xb6, 0x53, 0xca, 0x82, 0x27, 0x3b,
+                      0x7b, 0xfa, 0xd8, 0x04, 0x5d, 0x85, 0xa4, 0x70];
+    assert_eq!(super::Sha3::empty_digest(), empty_hash);
   }
 
   mod keccak_mac {
