@@ -40,7 +40,6 @@ impl From<gen::Error> for Error {
 fn gen_classes(mut ctx: gen::Context<File, File>,
                out_path: &std::path::Path) -> gen::Result<()> {
   use gen::proto::*;
-
   
   let ht = class!(b"HashTransformation" => {
     constant methods {
@@ -83,6 +82,7 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
   try!(cpp_stream.write_all(b"using namespace CryptoPP;\n\n"));
 
   let mut rs_binding_stream = try!(File::create(rust_binding_path));
+  try!(gen::generate_prelude(&mut rs_binding_stream));
   try!(rs_binding_stream.write_all(b"#[link(name = \"rustcryptopp\")]\n"));
 
   let ctx = gen::Context::new(cpp_stream, rs_binding_stream);

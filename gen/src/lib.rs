@@ -26,6 +26,19 @@ impl From<std::string::FromUtf8Error> for Error {
   }
 }
 
+pub fn generate_prelude<T: Write>(mut stream: T) -> Result<()> {
+  try!(stream.write_all(b"
+    pub trait CPPContext {
+      fn mut_ctx(&self) -> *mut c_void;
+      fn ctx(&self) -> *const c_void {
+        self.mut_ctx()
+      }
+    }
+  \n\n"));
+
+  Ok(())
+}
+
 pub struct Context<T, U> {
   cpp_stream: T,
   rs_binding_stream: U
@@ -240,6 +253,11 @@ impl<'a> NamedClass<'a> {
     try!(stream.write_all(b"() };\n\n    "));
     try!(stream.write_all(name));
     try!(stream.write_all(b" { ctx: ctx }\n  }\n}\n\n"));
+
+    try!(stream.write_all(b"impl cpp::CPPContext for "));
+    try!(stream.write_all(name));
+    try!(stream.write_all(b" {\n  fn mut_ctx(&self) -> *mut c_void { self.ctx }\n}"));
+    try!(stream.write_all(b"\n\n"));
 
     Ok(())
   }

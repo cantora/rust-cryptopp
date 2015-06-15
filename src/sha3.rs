@@ -4,20 +4,7 @@ use cpp;
 
 include!(concat!(env!("OUT_DIR"), "/SHA3_256.rs"));
 
-pub trait CPPContext {
-  fn mut_ctx(&self) -> *mut c_void;
-  fn ctx(&self) -> *const c_void {
-    self.mut_ctx()
-  }
-}
-
-impl CPPContext for Sha3 {
-  fn mut_ctx(&self) -> *mut c_void {
-    self.ctx
-  }
-}
-
-pub trait HashTransformation : CPPContext {
+pub trait HashTransformation : cpp::CPPContext {
   fn update(&mut self, data: &[u8]) {
     unsafe {
       cpp::mth_HashTransformation_Update(self.mut_ctx(),
