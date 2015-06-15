@@ -1,4 +1,4 @@
-use libc::{c_void, size_t};
+use libc::{c_void};
 
 use cpp;
 use hash::Function;

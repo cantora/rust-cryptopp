@@ -1,4 +1,4 @@
-use libc::{c_void, size_t};
+use libc::{size_t};
 use std::default::Default;
 
 use cpp;
@@ -55,6 +55,7 @@ impl DigestSize {
   }
 }
 
+/// things that satisfy the hash transformation interface.
 pub trait Function : cpp::CPPContext {
   /// updates the hash function state with input data.
   fn update(&mut self, data: &[u8]) {
@@ -74,6 +75,13 @@ pub trait Function : cpp::CPPContext {
     output
   }
 
+  // reset hash function state
+  fn reset(&mut self) {
+    unsafe {
+      cpp::mth_HashTransformation_Restart(self.mut_ctx())
+    };
+  }
+
   /// the digest size.
   fn size(&self) -> DigestSize {
     DigestSize::from_size_in_bytes(unsafe {
@@ -82,6 +90,8 @@ pub trait Function : cpp::CPPContext {
   }
 }
 
+/// a digest is a function that only takes input data and no other
+/// parameters.
 pub trait Digest : Function + Default {
   fn digest(data: &[u8]) -> [u8; 32] {
     let hash_fn = &mut Self::default();
