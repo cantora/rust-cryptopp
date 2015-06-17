@@ -1,13 +1,15 @@
 use libc::{c_void};
 
 use cpp;
-use hash::Function;
-use hash::Digest;
+use hash::{Transformation,
+           Function32,
+           Digest32};
 
 include!(concat!(env!("OUT_DIR"), "/SHA3_256.rs"));
 
-impl Function for Sha3 {}
-impl Digest for Sha3 {}
+impl Transformation for Sha3 {}
+impl Function32 for Sha3 {}
+impl Digest32 for Sha3 {}
 
 pub fn new() -> Sha3 {
   Sha3::new()
@@ -46,14 +48,15 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> [u8; 32] {
 
   keccak.update(secret);
   keccak.update(msg);
-  keccak.finalize()
+  keccak.final32()
 }
 
 #[cfg(test)]
 mod test {
   use hash::DigestSize;
-  use hash::Function;
-  use hash::Digest;
+  use hash::Transformation;
+  use hash::Function32;
+  use hash::Digest32;
 
   #[test]
   fn sanity() {
@@ -67,7 +70,7 @@ mod test {
     assert_eq!(sha3.size(), DigestSize::Bits256);
 
     sha3.update(msg);
-    assert_eq!(sha3.finalize(), expected);
+    assert_eq!(sha3.final32(), expected);
 
     assert_eq!(super::digest(msg), expected);
 

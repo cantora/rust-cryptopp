@@ -48,7 +48,7 @@ impl DigestSize {
 }
 
 /// things that satisfy the hash transformation interface.
-pub trait Function : cpp::CPPContext {
+pub trait Transformation : cpp::CPPContext {
   /// updates the hash function state with input data.
   fn update(&mut self, data: &[u8]) {
     unsafe {
@@ -59,12 +59,12 @@ pub trait Function : cpp::CPPContext {
   }
 
   /// returns the digest and resets the hash function state.
-  fn finalize(&mut self) -> [u8; 32] { //, output: &mut [u8]) {
-    let mut output = [0u8; 32];
+  fn finalize(&mut self, output: &mut [u8]) {
+    assert!(output.len() >= self.size().in_bytes() as usize);
+
     unsafe {
       cpp::mth_HashTransformation_Final(self.mut_ctx(), output.as_mut_ptr())
     };
-    output
   }
 
   // reset hash function state
@@ -82,13 +82,21 @@ pub trait Function : cpp::CPPContext {
   }
 }
 
+pub trait Function32 : Transformation {
+  fn final32(&mut self) -> [u8; 32] {
+    let mut output = [0u8; 32];
+    self.finalize(&mut output);
+    output
+  }
+}
+
 /// a digest is a function that only takes input data and no other
 /// parameters.
-pub trait Digest : Function + Default {
+pub trait Digest32 : Function32 + Default {
   fn digest(data: &[u8]) -> [u8; 32] {
     let hash_fn = &mut Self::default();
     hash_fn.update(data);
-    hash_fn.finalize()
+    hash_fn.final32()
   }
 
   fn empty_digest() -> [u8; 32] {
@@ -98,8 +106,8 @@ pub trait Digest : Function + Default {
 
 #[cfg(test)]
 mod test {
-  use super::Digest;
-  use super::Function;
+  use super::Digest32;
+  use super::Function32;
 
   #[test]
   fn digest_size_sanity() {
@@ -116,31 +124,32 @@ mod test {
     assert_eq!(ds2.in_bytes(), 32);
   }
 
-  pub fn reset<T: Digest>(mut d: T) {
+  pub fn reset<T: Digest32>(mut d: T) {
     d.reset();
-    assert_eq!(d.finalize(), T::empty_digest());
 
-    d.update(b"    assert_eq!(d.finalize(), T::empty_digest());");
+    assert_eq!(d.final32(), T::empty_digest());
+
+    d.update(b"    println!(\"buf = {:?}\n\", buf);");
     d.reset();
-    assert_eq!(d.finalize(), T::empty_digest());
+    assert_eq!(d.final32(), T::empty_digest());
   }
 
-  pub fn finalize<T: Digest>(mut d: T) {
+  pub fn finalize<T: Digest32>(mut d: T) {
     d.reset();
-    assert_eq!(d.finalize(), T::empty_digest());
+    assert_eq!(d.final32(), T::empty_digest());
 
     d.update(b"asdofijqwoeirj");
-    d.finalize();
+    d.final32();
 
-    assert_eq!(d.finalize(), T::empty_digest());
+    assert_eq!(d.final32(), T::empty_digest());
   }
 
-  pub fn update<T: Digest>(mut d: T) {
+  pub fn update<T: Digest32>(mut d: T) {
     d.reset();
-    assert_eq!(d.finalize(), T::empty_digest());
+    assert_eq!(d.final32(), T::empty_digest());
 
     d.update(b"");
-    assert_eq!(d.finalize(), T::empty_digest());
+    assert_eq!(d.final32(), T::empty_digest());
   }
 
 }
