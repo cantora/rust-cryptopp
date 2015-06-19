@@ -4,6 +4,7 @@ use std::io::Write;
 use std::convert::From;
 use std::error;
 use std::fs::File;
+use std::borrow::Borrow;
 
 #[derive(Debug)]
 pub enum Error {
@@ -40,8 +41,8 @@ pub fn generate_prelude<T: Write>(mut stream: T) -> Result<()> {
 }
 
 pub struct Context<T, U> {
-  cpp_stream: T,
-  rs_binding_stream: U
+  pub cpp_stream: T,
+  pub rs_binding_stream: U
 }
 
 impl<T: Write, U: Write> Context<T, U> {
@@ -51,13 +52,6 @@ impl<T: Write, U: Write> Context<T, U> {
       cpp_stream: cpp_stream,
       rs_binding_stream: rs_binding_stream
     }
-  }
-
-  pub fn generate<'a>(&mut self, class: &NamedClass<'a>) -> Result<()> {
-    class.anon_class.generate(&class.namespace,
-                              class.name,
-                              &mut self.cpp_stream,
-                              &mut self.rs_binding_stream)
   }
 }
 
@@ -192,16 +186,23 @@ macro_rules! class {
   });
 }
 
-pub struct NamedClass<'a> {
-  pub namespace:  Vec<&'a [u8]>,
-  pub name:       &'a [u8],
-  pub anon_class: Class,
+#[macro_export]
+macro_rules! anon_class {
+  ( $b:tt ) => (
+    class_bindings_block!($crate::class() => $b)
+  );
 }
 
-impl<'a> NamedClass<'a> {
+pub struct NamedClass<'a, T> {
+  pub namespace:  Vec<&'a [u8]>,
+  pub name:       &'a [u8],
+  pub anon_class: T,
+}
+
+impl<'a, T: Borrow<Class>> NamedClass<'a, T> {
   pub fn new(namespace:  Vec<&'a [u8]>,
              name:       &'a [u8],
-             anon_class: Class) -> NamedClass<'a> {
+             anon_class: T) -> NamedClass<'a, T> {
     NamedClass {
       namespace: namespace,
       name: name,
@@ -232,7 +233,7 @@ impl<'a> NamedClass<'a> {
     self.write_struct(name, &mut stream)
   }
 
-  pub fn write_struct<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
+  pub fn write_struct<U: Write>(&self, name: &'a [u8], mut stream: U) -> Result<()> {
     try!(stream.write_all(b"use std;\n\n"));
 
     try!(stream.write_all(b"pub struct "));
@@ -273,15 +274,23 @@ impl<'a> NamedClass<'a> {
     Ok(())
   }
 
-  pub fn generate_trait(&self,
-                        filepath: &std::path::Path,
-                        name: &'a [u8]) -> Result<()> {
-    let mut stream = try!(self.fstream_from_c_path(filepath));
-    self.write_trait(name, &mut stream)
-  }
+//  pub fn generate_trait(&self,
+//                        filepath: &std::path::Path,
+//                        name: &'a [u8]) -> Result<()> {
+//    let mut stream = try!(self.fstream_from_c_path(filepath));
+//    self.write_trait(name, &mut stream)
+//  }
+//
+//  pub fn write_trait<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
+//    unimplemented!()
+//  }
 
-  pub fn write_trait<T: Write>(&self, name: &'a [u8], mut stream: T) -> Result<()> {
-    unimplemented!()
+  pub fn generate_bindings<U: Write, V: Write>(&self, context: &mut Context<U, V>)
+      -> Result<()> {
+    self.anon_class.borrow().generate(&self.namespace,
+                             self.name,
+                             &mut context.cpp_stream,
+                             &mut context.rs_binding_stream)
   }
 }
 

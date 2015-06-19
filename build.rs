@@ -40,7 +40,8 @@ impl From<gen::Error> for Error {
 fn gen_classes(mut ctx: gen::Context<File, File>,
                out_path: &std::path::Path) -> gen::Result<()> {
   use gen::proto::*;
-  
+  let ctx_ptr = &mut ctx;
+
   let ht = class!(b"HashTransformation" => {
     constant methods {
       uint(), b"DigestSize";
@@ -51,23 +52,25 @@ fn gen_classes(mut ctx: gen::Context<File, File>,
       void(), b"Restart";
     }
   });
-  try!(ctx.generate(&ht));
+  try!(ht.generate_bindings(ctx_ptr));
 
-  let sha3 = class!(b"SHA3_256" => {
+  let hash = anon_class!({
     constructors {
       b"";
     }
   });
-  try!(ctx.generate(&sha3));
+
+  let sha3 = gen::NamedClass::new(vec![], b"SHA3_256", hash);
+  try!(sha3.generate_bindings(ctx_ptr));
   try!(sha3.generate_struct(out_path, b"Sha3"));
 
-  ctx.generate(&class!(b"Integer" => {
+  class!(b"Integer" => {
     constructors {
       b"";
       b"copy",      const_ref(Custom(b"Integer"));
       b"from_long", long();
     }
-  }))
+  }).generate_bindings(ctx_ptr)
 }
 
 fn gen_cpp_code(cpp_path: &std::path::Path,
