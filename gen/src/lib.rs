@@ -184,10 +184,27 @@ macro_rules! class {
       anon_class
     )
   });
+
+  ( $name:expr , $anon_class:expr ) => ({
+    $crate::NamedClass::new(
+      vec![],
+      $name,
+      $anon_class
+    )
+  });
+
+  ( $ns:expr, $name:expr , $anon_class:expr ) => ({
+    $crate::NamedClass::new(
+      $ns,
+      $name,
+      $anon_class
+    )
+  });
+
 }
 
 #[macro_export]
-macro_rules! anon_class {
+macro_rules! prototype_class {
   ( $b:tt ) => (
     class_bindings_block!($crate::class() => $b)
   );

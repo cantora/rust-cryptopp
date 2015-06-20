@@ -3,8 +3,6 @@ use std::default::Default;
 
 use cpp;
 
-pub mod sha3;
-
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DigestSize {
   Bits224,
@@ -82,32 +80,87 @@ pub trait Transformation : cpp::CPPContext {
   }
 }
 
-pub trait Function32 : Transformation {
-  fn final32(&mut self) -> [u8; 32] {
-    let mut output = [0u8; 32];
-    self.finalize(&mut output);
-    output
-  }
+macro_rules! define_Function_trait {
+  ($tname:ident, $sz:expr) => (
+    pub trait $tname : Transformation {
+      fn final_digest(&mut self) -> [u8; $sz] {
+        let mut output = [0u8; $sz];
+        self.finalize(&mut output);
+        output
+      }
+    }
+  )
 }
+
+define_Function_trait!(Function28, 28);
+define_Function_trait!(Function32, 32);
+define_Function_trait!(Function48, 48);
+define_Function_trait!(Function64, 64);
 
 /// a digest is a function that only takes input data and no other
 /// parameters.
-pub trait Digest32 : Function32 + Default {
-  fn digest(data: &[u8]) -> [u8; 32] {
-    let hash_fn = &mut Self::default();
-    hash_fn.update(data);
-    hash_fn.final32()
-  }
+macro_rules! define_Digest_trait {
+  ($tname:ident, $func_tname:ident, $sz:expr) => (
+    pub trait $tname : $func_tname + Default {
+      fn digest(data: &[u8]) -> [u8; $sz] {
+        let hash_fn = &mut Self::default();
+        hash_fn.update(data);
+        hash_fn.final_digest()
+      }
 
-  fn empty_digest() -> [u8; 32] {
-    Self::digest(b"")
-  }
+      fn empty_digest() -> [u8; $sz] {
+        Self::digest(b"")
+      }
+    }
+  )
+}
+
+define_Digest_trait!(Digest28, Function28, 28);
+define_Digest_trait!(Digest32, Function32, 32);
+define_Digest_trait!(Digest48, Function48, 48);
+define_Digest_trait!(Digest64, Function64, 64);
+
+
+macro_rules! define_Digest_tests {
+  ($tname:ident) => (
+    #[test]
+    pub fn reset() {
+      let mut d = super::$tname::new();
+      d.reset();
+
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"    println!(\"buf = {:?}\n\", buf);");
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+
+    #[test]
+    pub fn finalize() {
+      let mut d = super::$tname::new();
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"asdofijqwoeirj");
+      d.final_digest();
+
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+
+    #[test]
+    pub fn update() {
+      let mut d = super::$tname::new();
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"");
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+  )
 }
 
 #[cfg(test)]
 mod test {
-  use super::Digest32;
-  use super::Function32;
 
   #[test]
   fn digest_size_sanity() {
@@ -124,32 +177,7 @@ mod test {
     assert_eq!(ds2.in_bytes(), 32);
   }
 
-  pub fn reset<T: Digest32>(mut d: T) {
-    d.reset();
-
-    assert_eq!(d.final32(), T::empty_digest());
-
-    d.update(b"    println!(\"buf = {:?}\n\", buf);");
-    d.reset();
-    assert_eq!(d.final32(), T::empty_digest());
-  }
-
-  pub fn finalize<T: Digest32>(mut d: T) {
-    d.reset();
-    assert_eq!(d.final32(), T::empty_digest());
-
-    d.update(b"asdofijqwoeirj");
-    d.final32();
-
-    assert_eq!(d.final32(), T::empty_digest());
-  }
-
-  pub fn update<T: Digest32>(mut d: T) {
-    d.reset();
-    assert_eq!(d.final32(), T::empty_digest());
-
-    d.update(b"");
-    assert_eq!(d.final32(), T::empty_digest());
-  }
-
 }
+
+// must be defined down here to ensure macros are visible
+pub mod sha3;
