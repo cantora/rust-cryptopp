@@ -10,6 +10,16 @@ macro_rules! array_impls {
     $(
       pub struct $tname<T> ([T; $N]);
 
+      impl<T> $tname<T> {
+        pub fn array(&self) -> &[T; $N] {
+          self.as_ref()
+        }
+
+        pub fn mut_array(&mut self) -> &mut [T; $N] {
+          self.as_mut()
+        }
+      }
+
       impl<T> From<[T; $N]> for $tname<T> {
         fn from(arr: [T; $N]) -> $tname<T> {
           $tname(arr)
@@ -19,6 +29,20 @@ macro_rules! array_impls {
       impl<T> Into<[T; $N]> for $tname<T> {
         fn into(self) -> [T; $N] {
           self.0
+        }
+      }
+
+      impl<T> AsRef<[T; $N]> for $tname<T> {
+        #[inline]
+        fn as_ref(&self) -> &[T; $N] {
+          &self.0
+        }
+      }
+
+      impl<T> AsMut<[T; $N]> for $tname<T> {
+        #[inline]
+        fn as_mut(&mut self) -> &mut [T; $N] {
+          &mut self.0
         }
       }
 
