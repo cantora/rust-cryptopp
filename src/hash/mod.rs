@@ -81,25 +81,24 @@ pub trait Transformation : cpp::CPPContext {
 }
 
 use std::fmt::Debug;
-
 pub trait Function : Transformation {
-  type DigestResult : Default + AsMut<[u8]> + Eq + Debug;
+  type Result : Default + AsMut<[u8]> + Eq + Debug;
 
-  fn final_digest(&mut self) -> Self::DigestResult {
-    let mut output = Self::DigestResult::default();
+  fn final_digest(&mut self) -> Self::Result {
+    let mut output = Self::Result::default();
     self.finalize(output.as_mut());
     output
   }
 }
 
 pub trait Digest : Function + Default {
-  fn digest(data: &[u8]) -> Self::DigestResult {
+  fn digest(data: &[u8]) -> Self::Result {
     let hash_fn = &mut Self::default();
     hash_fn.update(data);
     hash_fn.final_digest()
   }
 
-  fn empty_digest() -> Self::DigestResult {
+  fn empty_digest() -> Self::Result {
     Self::digest(b"")
   }
 }
