@@ -10,7 +10,7 @@ macro_rules! define_sha3 {
     pub mod $modname {
       use cpp;
       use libc::{c_void};
-      use hash::{Transformation, Function, Digest};
+      use hash::{Transformation, Function};
       use arr;
 
       include!(concat!(env!("OUT_DIR"), $file));
@@ -20,8 +20,6 @@ macro_rules! define_sha3 {
       impl Function for Hash {
         size_to_arr_digest_result!(u8, $hsize);
       }
-  
-      impl Digest for Hash {}
   
       pub fn new() -> Hash {
         Hash::new()

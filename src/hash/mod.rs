@@ -81,7 +81,7 @@ pub trait Transformation : cpp::CPPContext {
 }
 
 use std::fmt::Debug;
-pub trait Function : Transformation {
+pub trait Function : Transformation + Default {
   type Output : Default + AsMut<[u8]> + Eq + Debug;
 
   fn final_digest(&mut self) -> Self::Output {
@@ -89,9 +89,7 @@ pub trait Function : Transformation {
     self.finalize(output.as_mut());
     output
   }
-}
 
-pub trait Digest : Function + Default {
   fn digest(data: &[u8]) -> Self::Output {
     let hash_fn = &mut Self::default();
     hash_fn.update(data);
@@ -102,6 +100,8 @@ pub trait Digest : Function + Default {
     Self::digest(b"")
   }
 }
+
+//pub trait Digest : Function + Default {
 
 #[cfg(test)]
 mod test {
@@ -122,9 +122,9 @@ mod test {
   }
 
   pub mod digest {
-    use hash::Digest;
+    use hash;
 
-    pub fn reset<T: Digest>() {
+    pub fn reset<T: hash::Function>() {
       let mut d = T::default();
       d.reset();
 
@@ -135,7 +135,7 @@ mod test {
       assert_eq!(d.final_digest(), T::empty_digest());
     }
 
-    pub fn finalize<T: Digest>() {
+    pub fn finalize<T: hash::Function>() {
       let mut d = T::default();
       d.reset();
       assert_eq!(d.final_digest(), T::empty_digest());
@@ -146,7 +146,7 @@ mod test {
       assert_eq!(d.final_digest(), T::empty_digest());
     }
 
-    pub fn update<T: Digest>() {
+    pub fn update<T: hash::Function>() {
       let mut d = T::default();
       d.reset();
       assert_eq!(d.final_digest(), T::empty_digest());
