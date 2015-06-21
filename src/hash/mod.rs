@@ -80,83 +80,28 @@ pub trait Transformation : cpp::CPPContext {
   }
 }
 
-macro_rules! define_Function_trait {
-  ($tname:ident, $sz:expr) => (
-    pub trait $tname : Transformation {
-      fn final_digest(&mut self) -> [u8; $sz] {
-        let mut output = [0u8; $sz];
-        self.finalize(&mut output);
-        output
-      }
-    }
-  )
+use std::fmt::Debug;
+
+pub trait Function : Transformation {
+  type DigestResult : Default + AsMut<[u8]> + Eq + Debug;
+
+  fn final_digest(&mut self) -> Self::DigestResult {
+    let mut output = Self::DigestResult::default();
+    self.finalize(output.as_mut());
+    output
+  }
 }
 
-define_Function_trait!(Function28, 28);
-define_Function_trait!(Function32, 32);
-define_Function_trait!(Function48, 48);
-define_Function_trait!(Function64, 64);
+pub trait Digest : Function + Default {
+  fn digest(data: &[u8]) -> Self::DigestResult {
+    let hash_fn = &mut Self::default();
+    hash_fn.update(data);
+    hash_fn.final_digest()
+  }
 
-/// a digest is a function that only takes input data and no other
-/// parameters.
-macro_rules! define_Digest_trait {
-  ($tname:ident, $func_tname:ident, $sz:expr) => (
-    pub trait $tname : $func_tname + Default {
-      fn digest(data: &[u8]) -> [u8; $sz] {
-        let hash_fn = &mut Self::default();
-        hash_fn.update(data);
-        hash_fn.final_digest()
-      }
-
-      fn empty_digest() -> [u8; $sz] {
-        Self::digest(b"")
-      }
-    }
-  )
-}
-
-define_Digest_trait!(Digest28, Function28, 28);
-define_Digest_trait!(Digest32, Function32, 32);
-define_Digest_trait!(Digest48, Function48, 48);
-define_Digest_trait!(Digest64, Function64, 64);
-
-
-macro_rules! define_Digest_tests {
-  ($tname:ident) => (
-    #[test]
-    pub fn reset() {
-      let mut d = super::$tname::new();
-      d.reset();
-
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-
-      d.update(b"    println!(\"buf = {:?}\n\", buf);");
-      d.reset();
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-    }
-
-    #[test]
-    pub fn finalize() {
-      let mut d = super::$tname::new();
-      d.reset();
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-
-      d.update(b"asdofijqwoeirj");
-      d.final_digest();
-
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-    }
-
-    #[test]
-    pub fn update() {
-      let mut d = super::$tname::new();
-      d.reset();
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-
-      d.update(b"");
-      assert_eq!(d.final_digest(), super::$tname::empty_digest());
-    }
-  )
+  fn empty_digest() -> Self::DigestResult {
+    Self::digest(b"")
+  }
 }
 
 #[cfg(test)]
@@ -175,6 +120,42 @@ mod test {
     assert_eq!(ds2, DS::Bits256);
     assert_eq!(ds2.in_bits(), 256);
     assert_eq!(ds2.in_bytes(), 32);
+  }
+
+  pub mod digest {
+    use hash::Digest;
+
+    pub fn reset<T: Digest>() {
+      let mut d = T::default();
+      d.reset();
+
+      assert_eq!(d.final_digest(), T::empty_digest());
+
+      d.update(b"70 72 6e b7 9a 31 54 5c  a6 b8 b7 94 5e c2 ea e5");
+      d.reset();
+      assert_eq!(d.final_digest(), T::empty_digest());
+    }
+
+    pub fn finalize<T: Digest>() {
+      let mut d = T::default();
+      d.reset();
+      assert_eq!(d.final_digest(), T::empty_digest());
+
+      d.update(b"asdofijqwoeirj");
+      d.final_digest();
+
+      assert_eq!(d.final_digest(), T::empty_digest());
+    }
+
+    pub fn update<T: Digest>() {
+      let mut d = T::default();
+      d.reset();
+      assert_eq!(d.final_digest(), T::empty_digest());
+
+      d.update(b"");
+      assert_eq!(d.final_digest(), T::empty_digest());
+    }
+
   }
 
 }

@@ -4,6 +4,15 @@ use std::fmt;
 use std::hash::{Hash, self};
 use std::iter::IntoIterator;
 use std::slice::{Iter, IterMut};
+use std::default::Default;
+
+#[macro_export]
+macro_rules! arr {
+  ($t:ty, 28) => (Arr28<$t>);
+  ($t:ty, 32) => (Arr32<$t>);
+  ($t:ty, 48) => (Arr48<$t>);
+  ($t:ty, 64) => (Arr64<$t>);
+}
 
 macro_rules! array_impls {
   ($( $tname:ident , $N:expr );+) => {
@@ -11,12 +20,22 @@ macro_rules! array_impls {
       pub struct $tname<T> ([T; $N]);
 
       impl<T> $tname<T> {
+        pub fn from_array(array: [T; $N]) -> $tname<T> {
+          $tname(array)
+        }
+
         pub fn array(&self) -> &[T; $N] {
           self.as_ref()
         }
 
         pub fn mut_array(&mut self) -> &mut [T; $N] {
           self.as_mut()
+        }
+      }
+
+      impl<T:Default + Copy> Default for $tname<T> {
+        fn default() -> $tname<T> {
+          $tname([T::default(); $N])
         }
       }
 

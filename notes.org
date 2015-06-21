@@ -1,0 +1,143 @@
+* associated constants
+- https://github.com/rust-lang/rfcs/pull/1062
+- https://github.com/rust-lang/rfcs/issues/1038
+- https://github.com/rust-lang/rfcs/pull/884
+- https://github.com/rust-lang/rfcs/pull/865
+- https://github.com/rust-lang/rust/pull/23606/ 
+- https://gist.github.com/freebroccolo/5f43b737cc1c28c96896
+* FunctionN, DigestN macro stuff
+** hash/mod.rs
+pub fn foo() -> [u8; 32] {
+  [0; 32]
+}
+
+pub fn foo2() -> Arr32<u8> {
+  Arr32 :: from_array([0; 32])
+}
+
+macro_rules! define_Function_trait {
+  ($tname:ident, $sz:expr) => (
+    pub trait $tname : Transformation {
+      fn final_digest(&mut self) -> [u8; $sz] {
+        let mut output = [0u8; $sz];
+        self.finalize(&mut output);
+        output
+      }
+    }
+  )
+}
+
+define_Function_trait!(Function28, 28);
+define_Function_trait!(Function32, 32);
+define_Function_trait!(Function48, 48);
+define_Function_trait!(Function64, 64);
+
+/// a digest is a function that only takes input data and no other
+/// parameters.
+macro_rules! define_Digest_trait {
+  ($tname:ident, $func_tname:ident, $sz:expr) => (
+    pub trait $tname : $func_tname + Default {
+      fn digest(data: &[u8]) -> [u8; $sz] {
+        let hash_fn = &mut Self::default();
+        hash_fn.update(data);
+        hash_fn.final_digest()
+      }
+
+      fn empty_digest() -> [u8; $sz] {
+        Self::digest(b"")
+      }
+    }
+  )
+}
+
+
+define_Digest_trait!(Digest28, Function28, 28);
+define_Digest_trait!(Digest32, Function32, 32);
+define_Digest_trait!(Digest48, Function48, 48);
+define_Digest_trait!(Digest64, Function64, 64);
+
+macro_rules! define_Digest_tests {
+  ($tname:ident) => (
+    #[test]
+    pub fn reset() {
+      let mut d = super::$tname::new();
+      d.reset();
+
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"    println!(\"buf = {:?}\n\", buf);");
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+
+    #[test]
+    pub fn finalize() {
+      let mut d = super::$tname::new();
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"asdofijqwoeirj");
+      d.final_digest();
+
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+
+    #[test]
+    pub fn update() {
+      let mut d = super::$tname::new();
+      d.reset();
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+
+      d.update(b"");
+      assert_eq!(d.final_digest(), super::$tname::empty_digest());
+    }
+  )
+}
+
+** hash/sha3.rs
+macro_rules! hash_impl_body {
+  ($tname:ident, $( $trt:ident ),+) => (
+    use hash::{ $( $trt ),+ };
+
+    $(
+      impl $trt for $tname {}
+    )+
+
+    #[cfg(test)]
+    mod digest_tests {
+      use hash::Transformation;
+      use hash::{ $( $trt ),+ };
+      define_Digest_tests!($tname);
+    }
+  )
+}
+
+macro_rules! token_to_expr {
+  ($tok:expr) => ($tok)
+}
+
+/*
+macro_rules! hash_impls {
+  (28, $tname:ident) => (
+    hash_impl_body!($tname, Function28, Digest28);
+  );
+
+  (32, $tname:ident) => (
+    hash_impl_body!($tname, Function32, Digest32);
+  );
+
+  (48, $tname:ident) => (
+    use hash::{Function48, Digest48};
+    impl Function48 for $tname {}
+    impl Digest48 for $tname {}
+  );
+
+  (64, $tname:ident) => (
+    use hash::{Function64, Digest64};
+    impl Function64 for $tname {}
+    impl Digest64 for $tname {}
+  );
+}
+*/
+
+
