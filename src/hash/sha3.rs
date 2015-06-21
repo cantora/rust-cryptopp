@@ -1,10 +1,10 @@
 use arr;
 
 macro_rules! size_to_arr_digest_result {
-  ($t:ty, 28) => (type Result = arr::Arr28<$t>;);
-  ($t:ty, 32) => (type Result = arr::Arr32<$t>;);
-  ($t:ty, 48) => (type Result = arr::Arr48<$t>;);
-  ($t:ty, 64) => (type Result = arr::Arr64<$t>;);
+  ($t:ty, 28) => (type Output = arr::Arr28<$t>;);
+  ($t:ty, 32) => (type Output = arr::Arr32<$t>;);
+  ($t:ty, 48) => (type Output = arr::Arr48<$t>;);
+  ($t:ty, 64) => (type Output = arr::Arr64<$t>;);
 }
 
 macro_rules! hash_impls {
@@ -47,11 +47,11 @@ macro_rules! define_sha3 {
         $tname::new()
       }
 
-      pub fn digest(msg: &[u8]) -> <$tname as Function>::Result {
+      pub fn digest(msg: &[u8]) -> <$tname as Function>::Output {
         $tname::digest(msg)
       }
 
-      pub fn empty_digest() -> <$tname as Function>::Result {
+      pub fn empty_digest() -> <$tname as Function>::Output {
         $tname::empty_digest()
       }
 
