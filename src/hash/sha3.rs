@@ -5,30 +5,8 @@ macro_rules! size_to_arr_digest_result {
   ($t:ty, 64) => (type Output = arr::Arr64<$t>;);
 }
 
-macro_rules! hash_impls {
-  ($hsize:tt, $tname:ident) => (
-    impl Function for $tname {
-      size_to_arr_digest_result!(u8, $hsize);
-    }
-
-    impl Digest for $tname {}
-
-    #[cfg(test)]
-    mod test {
-      use hash;
-
-      #[test]
-      fn digest_tests() {
-        hash::test::digest::reset::<super::$tname>();
-        hash::test::digest::finalize::<super::$tname>();
-        hash::test::digest::update::<super::$tname>();
-      }
-    }
-  )
-}
-
 macro_rules! define_sha3 {
-  ($file:expr, $modname:ident, $tname:ident, $hsize:tt) => (
+  ($file:expr, $modname:ident, $hsize:tt) => (
     pub mod $modname {
       use cpp;
       use libc::{c_void};
@@ -37,30 +15,46 @@ macro_rules! define_sha3 {
 
       include!(concat!(env!("OUT_DIR"), $file));
 
-      impl Transformation for $tname {}
+      impl Transformation for Hash {}
 
-      hash_impls!($hsize, $tname);
-
-      pub fn new() -> $tname {
-        $tname::new()
+      impl Function for Hash {
+        size_to_arr_digest_result!(u8, $hsize);
+      }
+  
+      impl Digest for Hash {}
+  
+      pub fn new() -> Hash {
+        Hash::new()
       }
 
-      pub fn digest(msg: &[u8]) -> <$tname as Function>::Output {
-        $tname::digest(msg)
+      pub fn digest(msg: &[u8]) -> <Hash as Function>::Output {
+        Hash::digest(msg)
       }
 
-      pub fn empty_digest() -> <$tname as Function>::Output {
-        $tname::empty_digest()
+      pub fn empty_digest() -> <Hash as Function>::Output {
+        Hash::empty_digest()
+      }
+
+      #[cfg(test)]
+      mod test {
+        use hash;
+  
+        #[test]
+        fn digest_tests() {
+          hash::test::digest::reset::<super::Hash>();
+          hash::test::digest::finalize::<super::Hash>();
+          hash::test::digest::update::<super::Hash>();
+        }
       }
 
     }
   )
 }
 
-define_sha3!("/SHA3_224.rs", h224, H224, 28);
-define_sha3!("/SHA3_256.rs", h256, H256, 32);
-define_sha3!("/SHA3_384.rs", h384, H384, 48);
-define_sha3!("/SHA3_512.rs", h512, H512, 64);
+define_sha3!("/SHA3_224.rs", h224, 28);
+define_sha3!("/SHA3_256.rs", h256, 32);
+define_sha3!("/SHA3_384.rs", h384, 48);
+define_sha3!("/SHA3_512.rs", h512, 64);
 
 #[cfg(test)]
 mod test {

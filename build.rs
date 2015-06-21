@@ -62,19 +62,19 @@ fn gen_classes(mut ctx: gen::Context<File, File>,
 
   let sha256 = class!(vec![], b"SHA3_256", &hash);
   try!(sha256.generate_bindings(ctx_ptr));
-  try!(sha256.generate_struct(out_path, b"H256"));
+  try!(sha256.generate_struct(out_path, b"Hash"));
 
   let sha224 = class!(vec![], b"SHA3_224", &hash);
   try!(sha224.generate_bindings(ctx_ptr));
-  try!(sha224.generate_struct(out_path, b"H224"));
+  try!(sha224.generate_struct(out_path, b"Hash"));
 
   let sha384 = class!(vec![], b"SHA3_384", &hash);
   try!(sha384.generate_bindings(ctx_ptr));
-  try!(sha384.generate_struct(out_path, b"H384"));
+  try!(sha384.generate_struct(out_path, b"Hash"));
 
   let sha512 = class!(vec![], b"SHA3_512", &hash);
   try!(sha512.generate_bindings(ctx_ptr));
-  try!(sha512.generate_struct(out_path, b"H512"));
+  try!(sha512.generate_struct(out_path, b"Hash"));
 
   class!(b"Integer" => {
     constructors {
