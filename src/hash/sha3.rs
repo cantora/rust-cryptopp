@@ -1,5 +1,3 @@
-use arr;
-
 macro_rules! size_to_arr_digest_result {
   ($t:ty, 28) => (type Output = arr::Arr28<$t>;);
   ($t:ty, 32) => (type Output = arr::Arr32<$t>;);
@@ -64,28 +62,6 @@ define_sha3!("/SHA3_256.rs", h256, H256, 32);
 define_sha3!("/SHA3_384.rs", h384, H384, 48);
 define_sha3!("/SHA3_512.rs", h512, H512, 64);
 
-/// produce a keccak hmac; that is, an hmac done insecurely but its
-/// ok because keccak is crazy like that.
-/// http://en.wikipedia.org/wiki/Hash-based_message_authentication_code
-/// the hmac is: `keccak(secret || msg)`
-/// maybe dangerous?
-///
-/// # Panics
-/// - when secret.len() < 16
-/// - when msg is empty
-pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> arr::Arr32<u8> {
-  use hash::{Transformation, Function};
-
-  assert!(secret.len() >= 16, "secret is dangerously small");
-  assert!(msg.len() > 0, "msg is empty");
-
-  let mut keccak = h256::new();
-
-  keccak.update(secret);
-  keccak.update(msg);
-  keccak.final_digest()
-}
-
 #[cfg(test)]
 mod test {
   use hash::DigestSize;
@@ -117,8 +93,6 @@ mod test {
                      0x33, 0x1f, 0x39, 0xc5, 0x7e, 0x3a, 0xbe, 0x37]);
 
     assert_eq!(super::h256::digest(msg2), expected2);
-
-    assert_eq!(super::keccak_mac(&msg2[..16], &msg2[16..]), expected2);
   }
 
 
@@ -131,17 +105,4 @@ mod test {
     assert_eq!(super::h256::empty_digest(), empty_hash);
   }
 
-  mod keccak_mac {
-    #[test]
-    #[should_panic]
-    fn panic_secret() {
-      super::super::keccak_mac(b"too short", b"msg");
-    }
-
-    #[test]
-    #[should_panic]
-    fn panic_msg() {
-      super::super::keccak_mac(b"0123456789012345", b"");
-    }
-  }
 }
