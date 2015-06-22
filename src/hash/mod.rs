@@ -80,9 +80,46 @@ pub trait Transformation : cpp::CPPContext {
   }
 }
 
+//TODO: remove Eq and replace it with a constant time Eq trait
+pub trait Digest : Default + AsMut<[u8]> + Eq + Debug {}
+
+use std::{slice, fmt, hash, cmp};
+macro_rules! define_digest_type {
+  ($tname:ident , $sz:expr) => (
+    array_wrap!($tname, u8, $sz, Default
+                                 From_array
+                                 Into_array
+                                 AsRef_array
+                                 AsMut_array
+                                 AsRef_slice
+                                 AsMut_slice
+                                 Hash
+                                 Debug
+                                 IntoIterator
+                                 PartialEq
+                                 Eq
+                                 PartialOrd
+                                 Ord);
+
+    impl Digest for $tname {}
+  )
+}
+
+define_digest_type!(Digest28, 28);
+define_digest_type!(Digest32, 32);
+define_digest_type!(Digest48, 48);
+define_digest_type!(Digest64, 64);
+
+macro_rules! size_to_output_type {
+  (28) => (type Output = hash::Digest28;);
+  (32) => (type Output = hash::Digest32;);
+  (48) => (type Output = hash::Digest48;);
+  (64) => (type Output = hash::Digest64;);
+}
+
 use std::fmt::Debug;
 pub trait Function : Transformation + Default {
-  type Output : Default + AsMut<[u8]> + Eq + Debug;
+  type Output : Digest;
 
   fn final_digest(&mut self) -> Self::Output {
     let mut output = Self::Output::default();
@@ -100,8 +137,6 @@ pub trait Function : Transformation + Default {
     Self::digest(b"")
   }
 }
-
-//pub trait Digest : Function + Default {
 
 #[cfg(test)]
 mod test {
