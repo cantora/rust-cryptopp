@@ -1,4 +1,6 @@
 
+macro_rules! to_expr { ($e:expr) => ($e) }
+
 macro_rules! define_sha3 {
   ($file:expr, $modname:ident, $hsize:tt) => (
     pub mod $modname {
@@ -31,6 +33,15 @@ macro_rules! define_sha3 {
       #[cfg(test)]
       mod test {
         use hash;
+
+        #[test]
+        fn size_sanity() {
+          use super::Hash;
+          use hash::Digest;
+
+          let dsize = hash::DigestSize::from_size_in_bytes(to_expr!($hsize));
+          assert_eq!(dsize, <Hash as hash::Function>::Output::size());
+        }
   
         #[test]
         fn digest_tests() {

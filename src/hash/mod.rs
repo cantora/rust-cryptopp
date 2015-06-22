@@ -131,6 +131,7 @@ define_digest_type!(digest32, Digest32, 32);
 define_digest_type!(digest48, Digest48, 48);
 define_digest_type!(digest64, Digest64, 64);
 
+//this relationship is checked by the `size_sanity` test in generated hash functions
 macro_rules! size_to_output_type {
   (28) => (type Output = hash::Digest28;);
   (32) => (type Output = hash::Digest32;);
