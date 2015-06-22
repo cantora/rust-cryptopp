@@ -60,21 +60,22 @@ fn gen_classes(mut ctx: gen::Context<File, File>,
     }
   });
 
-  let sha256 = class!(vec![], b"SHA3_256", &hash);
-  try!(sha256.generate_bindings(ctx_ptr));
-  try!(sha256.generate_struct(out_path, b"Hash"));
+  macro_rules! gen_hash {
+    () => ();
 
-  let sha224 = class!(vec![], b"SHA3_224", &hash);
-  try!(sha224.generate_bindings(ctx_ptr));
-  try!(sha224.generate_struct(out_path, b"Hash"));
+    ($cpp_name:expr, $( $rest:tt )* ) => ({
+      let concrete_hash = class!(vec![], $cpp_name, &hash);
+      try!(concrete_hash.generate_bindings(ctx_ptr));
+      try!(concrete_hash.generate_struct(out_path, b"Hash"));
+      gen_hash!($( $rest )*);
+    })
+  }
 
-  let sha384 = class!(vec![], b"SHA3_384", &hash);
-  try!(sha384.generate_bindings(ctx_ptr));
-  try!(sha384.generate_struct(out_path, b"Hash"));
-
-  let sha512 = class!(vec![], b"SHA3_512", &hash);
-  try!(sha512.generate_bindings(ctx_ptr));
-  try!(sha512.generate_struct(out_path, b"Hash"));
+  gen_hash!(b"SHA1",
+            b"SHA3_224",
+            b"SHA3_256",
+            b"SHA3_384",
+            b"SHA3_512",);
 
   class!(b"Integer" => {
     constructors {
@@ -92,6 +93,7 @@ fn gen_cpp_code(cpp_path: &std::path::Path,
   let mut cpp_stream = try!(File::create(cpp_path));
 
   try!(cpp_stream.write_all(b"#include <cryptopp/cryptlib.h>\n"));
+  try!(cpp_stream.write_all(b"#include <cryptopp/sha.h>\n"));
   try!(cpp_stream.write_all(b"#include <cryptopp/sha3.h>\n"));
   try!(cpp_stream.write_all(b"#include <cryptopp/integer.h>\n"));
   try!(cpp_stream.write_all(b"using namespace CryptoPP;\n\n"));

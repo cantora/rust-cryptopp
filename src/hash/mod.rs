@@ -5,6 +5,7 @@ use cpp;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DigestSize {
+  Bits160,
   Bits224,
   Bits256,
   Bits384,
@@ -21,6 +22,7 @@ impl DigestSize {
     use self::DigestSize::*;
 
     match self {
+      &Bits160 => 20,
       &Bits224 => 28,
       &Bits256 => 32,
       &Bits384 => 48,
@@ -34,6 +36,7 @@ impl DigestSize {
 
   fn from_size_in_bits(bits: u32) -> DigestSize {
     match bits {
+      160 => DigestSize::Bits160,
       224 => DigestSize::Bits224,
       256 => DigestSize::Bits256,
       384 => DigestSize::Bits384,
@@ -126,6 +129,7 @@ macro_rules! define_digest_type {
   )
 }
 
+define_digest_type!(digest20, Digest20, 20);
 define_digest_type!(digest28, Digest28, 28);
 define_digest_type!(digest32, Digest32, 32);
 define_digest_type!(digest48, Digest48, 48);
@@ -133,6 +137,7 @@ define_digest_type!(digest64, Digest64, 64);
 
 //this relationship is checked by the `size_sanity` test in generated hash functions
 macro_rules! size_to_output_type {
+  (20) => (type Output = hash::Digest20;);
   (28) => (type Output = hash::Digest28;);
   (32) => (type Output = hash::Digest32;);
   (48) => (type Output = hash::Digest48;);
@@ -211,8 +216,8 @@ mod test {
       d.update(b"");
       assert_eq!(d.final_digest(), T::empty_digest());
     }
-
   }
+
 
 }
 
@@ -272,5 +277,6 @@ macro_rules! define_sized_hash_module {
   )
 }
 
-// must be defined down here to ensure macros are visible
+// sub-modules must be defined down here to ensure macros are visible
+define_sized_hash_module!("/SHA1.rs", sha1, 20);
 pub mod sha3;
