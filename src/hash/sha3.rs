@@ -1,64 +1,8 @@
 
-macro_rules! to_expr { ($e:expr) => ($e) }
-
-macro_rules! define_sha3 {
-  ($file:expr, $modname:ident, $hsize:tt) => (
-    pub mod $modname {
-      use cpp;
-      use libc::{c_void};
-      use hash;
-      use hash::{Transformation, Function};
-
-      include!(concat!(env!("OUT_DIR"), $file));
-
-      impl Transformation for Hash {}
-
-      impl Function for Hash {
-        //size_to_arr_digest_result!(u8, $hsize);
-        size_to_output_type!($hsize);
-      }
-  
-      pub fn new() -> Hash {
-        Hash::new()
-      }
-
-      pub fn digest(msg: &[u8]) -> <Hash as Function>::Output {
-        Hash::digest(msg)
-      }
-
-      pub fn empty_digest() -> <Hash as Function>::Output {
-        Hash::empty_digest()
-      }
-
-      #[cfg(test)]
-      mod test {
-        use hash;
-
-        #[test]
-        fn size_sanity() {
-          use super::Hash;
-          use hash::Digest;
-
-          let dsize = hash::DigestSize::from_size_in_bytes(to_expr!($hsize));
-          assert_eq!(dsize, <Hash as hash::Function>::Output::size());
-        }
-  
-        #[test]
-        fn digest_tests() {
-          hash::test::digest::reset::<super::Hash>();
-          hash::test::digest::finalize::<super::Hash>();
-          hash::test::digest::update::<super::Hash>();
-        }
-      }
-
-    }
-  )
-}
-
-define_sha3!("/SHA3_224.rs", h224, 28);
-define_sha3!("/SHA3_256.rs", h256, 32);
-define_sha3!("/SHA3_384.rs", h384, 48);
-define_sha3!("/SHA3_512.rs", h512, 64);
+define_sized_hash_module!("/SHA3_224.rs", h224, 28);
+define_sized_hash_module!("/SHA3_256.rs", h256, 32);
+define_sized_hash_module!("/SHA3_384.rs", h384, 48);
+define_sized_hash_module!("/SHA3_512.rs", h512, 64);
 
 #[cfg(test)]
 mod test {
