@@ -26,6 +26,10 @@ macro_rules! array_wrap_base {
       pub fn mut_array(&mut self) -> &mut [$titem; $N] {
         &mut self.0
       }
+
+      pub fn len(&self) -> usize {
+        self.0.len()
+      }
     }
   )
 }

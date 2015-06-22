@@ -81,34 +81,55 @@ pub trait Transformation : cpp::CPPContext {
 }
 
 //TODO: remove Eq and replace it with a constant time Eq trait
-pub trait Digest : Default + AsMut<[u8]> + Eq + Debug {}
+pub trait Digest : Default + AsMut<[u8]> + Eq + Debug {
+  fn size() -> DigestSize;
+}
 
-use std::{slice, fmt, hash, cmp};
 macro_rules! define_digest_type {
-  ($tname:ident , $sz:expr) => (
-    array_wrap!($tname, u8, $sz, Default
-                                 From_array
-                                 Into_array
-                                 AsRef_array
-                                 AsMut_array
-                                 AsRef_slice
-                                 AsMut_slice
-                                 Hash
-                                 Debug
-                                 IntoIterator
-                                 PartialEq
-                                 Eq
-                                 PartialOrd
-                                 Ord);
+  ($modname:ident, $tname:ident , $sz:expr) => (
+    mod $modname {
+      use std::{slice, fmt, hash, cmp};
 
-    impl Digest for $tname {}
+      array_wrap!($tname, u8, $sz, Default
+                                   From_array
+                                   Into_array
+                                   AsRef_array
+                                   AsMut_array
+                                   AsRef_slice
+                                   AsMut_slice
+                                   Hash
+                                   Debug
+                                   IntoIterator
+                                   PartialEq
+                                   Eq
+                                   PartialOrd
+                                   Ord);
+
+      impl super::Digest for $tname {
+        fn size() -> super::DigestSize {
+          super::DigestSize::from_size_in_bytes($sz)
+        }
+      }
+
+      #[cfg(test)]
+      mod test {
+        #[test]
+        fn sanity() {
+          use super::super::Digest;
+          assert_eq!(super::$tname::default().len(),
+                     super::$tname::size().in_bytes() as usize);
+        }
+      }
+    }
+
+    pub use self::$modname::$tname;
   )
 }
 
-define_digest_type!(Digest28, 28);
-define_digest_type!(Digest32, 32);
-define_digest_type!(Digest48, 48);
-define_digest_type!(Digest64, 64);
+define_digest_type!(digest28, Digest28, 28);
+define_digest_type!(digest32, Digest32, 32);
+define_digest_type!(digest48, Digest48, 48);
+define_digest_type!(digest64, Digest64, 64);
 
 macro_rules! size_to_output_type {
   (28) => (type Output = hash::Digest28;);

@@ -182,3 +182,26 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> arr::Arr32<u8> {
   }
 *** test/sanity()
     assert_eq!(super::keccak_mac(&msg2[..16], &msg2[16..]), expected2);
+*** check len test
+//  #[test]
+//  fn digest_types_sanity() {
+//    use super::Digest;
+//    macro_rules! check_len {
+//      () => ();
+//
+//      ($tname:path) => (
+//        assert_eq!(<$tname as Default>::default().len(),
+//                   <$tname as Digest>::size().in_bytes() as usize);
+//      );
+//
+//      ($tname:path, $( $rest:tt )*) => (
+//        check_len!($tname);
+//        check_len!($( $rest)*);
+//      )
+//    }
+//
+//    check_len!(super::Digest28,
+//               super::Digest32,
+//               super::Digest48,
+//               super::Digest64);
+//  }
