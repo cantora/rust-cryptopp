@@ -8,7 +8,9 @@ build = "build.rs"
 [dependencies]
 libc = "0.1"
 
-#[dev-dependencies]
+[dev-dependencies]
+#parser-combinators = "0.5.1"
+nom = "~0.3.0"
 
 [build-dependencies]
 pkg-config = "0.3"

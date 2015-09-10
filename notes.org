@@ -140,7 +140,6 @@ macro_rules! hash_impls {
 }
 */
 
-
 * trashed
 ** hash/sha3.rs
 *** keccak stuff
@@ -205,3 +204,46 @@ pub fn keccak_mac(secret: &[u8], msg: &[u8]) -> arr::Arr32<u8> {
 //               super::Digest48,
 //               super::Digest64);
 //  }
+* rust play
+** state mutating
+#[derive(Debug)]
+enum State {
+  Bar(u32),
+  Foo(u32)
+}
+
+#[derive(Debug)]
+struct Thing {
+  other_stuff: String,
+  state: State
+}
+
+impl Thing {
+  fn something_funny(&self) -> Result<(), String> {
+    println!("{}", self.other_stuff);
+    Ok(())
+  }
+}
+
+fn toggle(thing: &mut Thing) -> Result<(), String> {
+  thing.state = match thing.state {
+    State::Bar(n) => {
+      try!(thing.something_funny());
+      State::Foo(n+1)
+    },
+    State::Foo(n) => State::Bar(n*2)
+  };
+  
+  Ok(())
+}
+
+fn main() {
+  let mut thing = Thing {
+    other_stuff: "asdf".to_string(),
+    state: State::Bar(1)
+  };
+  
+  println!("thing {:?}", thing);
+  toggle(&mut thing).unwrap();
+  println!("thing {:?}", thing);
+}

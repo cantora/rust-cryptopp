@@ -3,6 +3,16 @@ use std::default::Default;
 
 use cpp;
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+pub enum Algorithm {
+  Sha1,
+  Sha3_224,
+  Sha3_256,
+  Sha3_384,
+  Sha3_512
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DigestSize {
   Bits160,
@@ -218,7 +228,14 @@ mod test {
     }
   }
 
-
+  #[test]
+  fn sha1_test_vectors() {
+    use test::cryptopp;
+    
+    for test in cryptopp::Vector::new("sha.txt") {
+      println!("algo: {:?}", test);
+    }
+  }
 }
 
 macro_rules! to_expr { ($e:expr) => ($e) }
